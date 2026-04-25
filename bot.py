@@ -1,0 +1,196 @@
+import json
+import logging
+import os
+from pathlib import Path
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from db import Database
+from cogs.applications import ApplicationCog
+from cogs.moderation import ModerationCog
+from cogs.training import TrainingCog, TrainingShoutView
+
+BASE_DIR = Path(__file__).parent
+CONFIG_PATH = BASE_DIR / "config.json"
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+
+def load_config() -> dict:
+    config = {}
+    
+    # Load from environment variables first (for deployment)
+    if os.getenv("DISCORD_TOKEN"):
+        config["token"] = os.getenv("DISCORD_TOKEN")
+        config["guild_id"] = int(os.getenv("GUILD_ID", "0"))
+        config["review_channel_id"] = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
+        config["infraction_log_channel_id"] = int(os.getenv("INFRACTION_LOG_CHANNEL_ID", "0"))
+        config["promotion_log_channel_id"] = int(os.getenv("PROMOTION_LOG_CHANNEL_ID", "0"))
+        config["staff_role_id"] = int(os.getenv("STAFF_ROLE_ID", "0"))
+        config["embed_color"] = int(os.getenv("EMBED_COLOR", "1973790"))
+        config["panel_banner_url"] = os.getenv("PANEL_BANNER_URL", "")
+        config["logo_url"] = os.getenv("LOGO_URL", "")
+    else:
+        # Fallback to config.json for local development
+        if not CONFIG_PATH.exists():
+            raise FileNotFoundError("config.json is missing. Copy config.example.json to config.json and fill in your values.")
+        config = json.loads(CONFIG_PATH.read_text())
+    
+    return config
+
+
+config = load_config()
+
+def get_intents() -> discord.Intents:
+    intents = discord.Intents.default()
+    intents.guilds = True
+    intents.messages = True
+    intents.members = True
+    intents.message_content = True
+    return intents
+
+
+class FloridaRPBot(commands.Bot):
+    def __init__(self, config: dict):
+        super().__init__(command_prefix="!", intents=get_intents(), application_id=config.get("application_id"))
+        self.config = config
+        self.db = Database(BASE_DIR / "data" / "storage.sqlite")
+        self.afk_users = {}
+        self.tree.on_error = self.on_app_command_error
+
+    async def setup_hook(self) -> None:
+        await self.add_cog(ModerationCog(self))
+        await self.add_cog(ApplicationCog(self))
+        await self.add_cog(TrainingCog(self))
+        self.add_view(TrainingShoutView())
+        guild = discord.Object(id=self.config["guild_id"])
+        self.tree.clear_commands(guild=guild)
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
+
+    async def on_ready(self) -> None:
+        logging.info("Logged in as %s (%s)", self.user, self.user.id)
+        logging.info("Connected to guild %s", self.config["guild_id"])
+
+    async def on_message(self, message):
+        if message.author.bot:
+            return
+        if message.author.id in self.afk_users:
+            reason = self.afk_users.pop(message.author.id)
+            if reason:
+                await message.channel.send(f"Welcome back {message.author.mention} from {reason}!")
+            else:
+                await message.channel.send(f"Welcome back, {message.author.mention}!")
+        await self.process_commands(message)
+
+    async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
+            return
+        logging.exception("Unhandled app command error")
+        if interaction.response.is_done():
+            return
+        await interaction.response.send_message("An unexpected error occurred. Please try again later.", ephemeral=True)
+
+
+bot = FloridaRPBot(config)
+
+
+@bot.tree.command(name="embed", description="Create a custom structured embed")
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.describe(
+    header="The main header/title of the embed",
+    description="The description text",
+    section1_title="Title for the first section",
+    section1_text="Text for the first section",
+    section2_title="Title for the second section",
+    section2_text="Text for the second section",
+    footer="Footer text for the embed"
+)
+async def create_embed(
+    interaction: discord.Interaction,
+    header: str = "Welcome to Florida State Roleplay Staff Team",
+    description: str = "This is your central hub for all staff tools, systems, and resources.",
+    section1_title: str = "Group Commands",
+    section1_text: str = "/group-request",
+    section2_title: str = "Links",
+    section2_text: str = "• Training Guides\n• Whitelisted Group",
+    footer: str = "Florida State Roleplay • System Panel"
+) -> None:
+    # Create the custom embed
+    embed = discord.Embed(
+        color=0x2b2d31,  # Clean dark theme
+    )
+    
+    # Build the description with structured formatting
+    embed_description = f"## {header}\n{description}\n\n"
+    
+    if section1_title and section1_text:
+        embed_description += f"**{section1_title}:**\n{section1_text}\n\n"
+    
+    if section2_title and section2_text:
+        embed_description += f"**{section2_title}:**\n{section2_text}"
+    
+    embed.description = embed_description
+    
+    # Add logo to author section
+    embed.set_author(name="Florida State Roleplay", icon_url=config.get("logo_url", ""))
+    
+    # Add timestamp and custom footer text
+    embed.timestamp = discord.utils.utcnow()
+    embed.set_footer(text=footer, icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="setup-panel", description="Create the Florida RP bot hub panel in the current channel.")
+@app_commands.checks.has_permissions(administrator=True)
+async def setup_panel(interaction: discord.Interaction) -> None:
+    embed = discord.Embed(
+        title="🎮 FLORIDA STATE ROLEPLAY",
+        description="**Professional Moderation & Management System**\n\n**Commands:**\n`/infract @user @role reason` • Issue infractions\n`/promote @user @role reason` • Promote members\n`/ban @user reason` • Ban users\n\n**Features:**\n• Staff applications & role management\n• Roblox verification system\n• Automatic logging & tracking\n• Real-time moderation reports",
+        color=0x1e40af,  # Glossy blue color
+    )
+    embed.set_thumbnail(url=config.get("panel_banner_url", "https://i.imgur.com/Hu4KZ7h.png"))
+    embed.set_author(name="Professional Moderation Panel", icon_url=config.get("logo_url", ""))
+    embed.timestamp = discord.utils.utcnow()
+    embed.set_footer(text="Glass UI • Florida State Roleplay • Professional System")
+
+    view = discord.ui.View(timeout=None)
+    view.add_item(discord.ui.Button(label="Apply for Staff", style=discord.ButtonStyle.primary, custom_id="florida_rp_apply"))
+    view.add_item(discord.ui.Button(label="Verify Roblox", style=discord.ButtonStyle.secondary, custom_id="florida_rp_verify"))
+
+    await interaction.response.send_message(embed=embed, view=view)
+
+
+@bot.tree.command(name="sync-commands", description="Sync the bot's slash commands to the guild")
+@app_commands.checks.has_permissions(administrator=True)
+async def sync_commands(interaction: discord.Interaction) -> None:
+    await bot.tree.sync(guild=discord.Object(id=config["guild_id"]))
+    await interaction.response.send_message("✅ Slash commands synced.", ephemeral=True)
+
+
+@bot.tree.command(name="afk", description="Set yourself as AFK.")
+@app_commands.describe(reason="The reason for going AFK (optional)")
+async def afk_command(interaction: discord.Interaction, reason: str = None):
+    bot.afk_users[interaction.user.id] = reason
+    if reason:
+        await interaction.response.send_message(f"You have been successfully set AFK due to {reason}.", ephemeral=True)
+    else:
+        await interaction.response.send_message("You have been successfully set AFK.", ephemeral=True)
+
+
+@bot.event
+async def on_interaction(interaction: discord.Interaction) -> None:
+    if interaction.type != discord.InteractionType.component:
+        return
+
+    if interaction.data.get("custom_id") == "florida_rp_verify":
+        await bot.get_cog("ApplicationCog").open_verify_modal(interaction)
+        return
+
+
+if __name__ == "__main__":
+    bot.run(config["token"])

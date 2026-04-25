@@ -1,0 +1,14 @@
+[project]
+name = "florida-rp-discord-bot"
+version = "0.1.0"
+description = "A Florida State Roleplay Discord bot with moderation panels, applications, and Roblox verification."
+readme = "README.md"
+requires-python = ">=3.11"
+
+[project.dependencies]
+discord.py = "^2.4.0"
+python-dotenv = "^1.0.0"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
