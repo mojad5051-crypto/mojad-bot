@@ -249,12 +249,10 @@
         textareas.forEach((textarea, index) => {
             textarea.addEventListener('paste', (e) => {
                 setTimeout(() => {
-                    if (textarea.value.length > 100) { // Threshold for large paste
-                        const warningId = `warning${index + 1}`;
-                        if (index === 4) warningId = 'warningAdditional';
-                        document.getElementById(warningId).textContent = 'Large paste detected. Please type your answers in your own words. AI or copied answers will be flagged.';
-                        document.getElementById(warningId).classList.remove('hidden');
-                    }
+                    const warningId = `warning${index + 1}`;
+                    if (index === 4) warningId = 'warningAdditional';
+                    document.getElementById(warningId).textContent = 'Paste detected. Please type your answers in your own words. AI or copied answers will be flagged.';
+                    document.getElementById(warningId).classList.remove('hidden');
                 }, 0);
             });
         });
