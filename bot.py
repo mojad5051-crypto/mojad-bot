@@ -6,6 +6,7 @@ from pathlib import Path
 import discord
 from discord import app_commands
 from discord.ext import commands
+from dotenv import load_dotenv
 
 from db import Database
 from cogs.applications import ApplicationCog
@@ -19,24 +20,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 
 def load_config() -> dict:
+    load_dotenv()
     config = {}
     
-    # Load from environment variables first (for deployment)
-    if os.getenv("DISCORD_TOKEN"):
-        config["token"] = os.getenv("DISCORD_TOKEN")
-        config["guild_id"] = int(os.getenv("GUILD_ID", "0"))
-        config["review_channel_id"] = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
-        config["infraction_log_channel_id"] = int(os.getenv("INFRACTION_LOG_CHANNEL_ID", "0"))
-        config["promotion_log_channel_id"] = int(os.getenv("PROMOTION_LOG_CHANNEL_ID", "0"))
-        config["staff_role_id"] = int(os.getenv("STAFF_ROLE_ID", "0"))
-        config["embed_color"] = int(os.getenv("EMBED_COLOR", "1973790"))
-        config["panel_banner_url"] = os.getenv("PANEL_BANNER_URL", "")
-        config["logo_url"] = os.getenv("LOGO_URL", "")
-    else:
-        # Fallback to config.json for local development
-        if not CONFIG_PATH.exists():
-            raise FileNotFoundError("config.json is missing. Copy config.example.json to config.json and fill in your values.")
-        config = json.loads(CONFIG_PATH.read_text())
+    # Load from environment variables (required for deployment and local with .env)
+    config["token"] = os.getenv("DISCORD_TOKEN")
+    if not config["token"]:
+        raise ValueError("DISCORD_TOKEN environment variable is required. Set it in Railway or create a .env file locally.")
+    
+    config["guild_id"] = int(os.getenv("GUILD_ID", "0"))
+    config["review_channel_id"] = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
+    config["infraction_log_channel_id"] = int(os.getenv("INFRACTION_LOG_CHANNEL_ID", "0"))
+    config["promotion_log_channel_id"] = int(os.getenv("PROMOTION_LOG_CHANNEL_ID", "0"))
+    config["staff_role_id"] = int(os.getenv("STAFF_ROLE_ID", "0"))
+    config["embed_color"] = int(os.getenv("EMBED_COLOR", "1973790"))
+    config["panel_banner_url"] = os.getenv("PANEL_BANNER_URL", "")
+    config["logo_url"] = os.getenv("LOGO_URL", "")
     
     return config
 
