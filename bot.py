@@ -186,6 +186,16 @@ async def on_interaction(interaction: discord.Interaction) -> None:
     if interaction.type != discord.InteractionType.component:
         return
 
+    if interaction.data.get("custom_id") == "florida_rp_apply":
+        embed = discord.Embed(
+            title="Staff Application",
+            description="To apply for staff, please fill out our detailed application form.\n\n[Click here to apply](https://mojad5051-crypto.github.io/mojad/apply.html)",
+            color=0x9b59b6,
+        )
+        embed.set_footer(text="Florida State Roleplay • Application System")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
     if interaction.data.get("custom_id") == "florida_rp_verify":
         await bot.get_cog("ApplicationCog").open_verify_modal(interaction)
         return
