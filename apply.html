@@ -246,14 +246,10 @@
 
         // Autopaste detection
         const textareas = document.querySelectorAll('textarea');
+        const pastedFields = new Set();
         textareas.forEach((textarea, index) => {
             textarea.addEventListener('paste', (e) => {
-                setTimeout(() => {
-                    const warningId = `warning${index + 1}`;
-                    if (index === 4) warningId = 'warningAdditional';
-                    document.getElementById(warningId).textContent = 'Paste detected. Please type your answers in your own words. AI or copied answers will be flagged.';
-                    document.getElementById(warningId).classList.remove('hidden');
-                }, 0);
+                pastedFields.add(textarea.id);
             });
         });
 
@@ -328,7 +324,7 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             data.aiScores = aiScores;
-            data.pasteWarnings = Array.from(textareas).map(ta => ta.nextElementSibling?.textContent.includes('Large paste') ? ta.id : null).filter(Boolean);
+            data.pasteWarnings = Array.from(pastedFields);
 
             // Send to Discord webhook
             const embed = {
