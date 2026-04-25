@@ -25,8 +25,8 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .card {
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
+            background-color: #dbeeff;
+            border: 1px solid #8fb6ff;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s, box-shadow 0.2s;
@@ -34,6 +34,16 @@
         .card:hover {
             transform: translateY(-2px);
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+        .card input,
+        .card textarea {
+            background-color: #eef6ff;
+            border-color: #8fb6ff;
+            color: #0f172a;
+        }
+        .card input:focus,
+        .card textarea:focus {
+            box-shadow: 0 0 0 4px rgba(56, 165, 105, 0.2);
         }
         .fading-green {
             color: #38a169;
@@ -115,7 +125,10 @@
                         <input type="text" id="aama" name="aama" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
                     </div>
                 </div>
-                <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-4">Next</button>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
             </div>
 
             <!-- Scenario Questions -->
@@ -147,7 +160,10 @@
                         <div id="aiScore4" class="text-sm text-gray-500 mt-1"></div>
                     </div>
                 </div>
-                <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-4">Next</button>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
             </div>
 
             <!-- Agreement -->
@@ -181,7 +197,10 @@
                         </div>
                     </div>
                 </div>
-                <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-4">Next</button>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
             </div>
 
             <!-- Additional Information -->
@@ -193,12 +212,18 @@
                     <div id="warningAdditional" class="warning hidden"></div>
                     <div id="aiScoreAdditional" class="text-sm text-gray-500 mt-1"></div>
                 </div>
-                <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-4">Next</button>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
             </div>
 
             <!-- Submit Button -->
             <div id="submit" class="card p-6 text-center" style="display: none;">
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-200">Submit Application</button>
+                <div class="flex items-center justify-center gap-3">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-200">Submit Application</button>
+                </div>
             </div>
         </form>
 
@@ -360,6 +385,12 @@
         function nextPage() {
             if (currentPage < pages.length - 1) {
                 currentPage++;
+                showPage(currentPage);
+            }
+        }
+        function prevPage() {
+            if (currentPage > 0) {
+                currentPage--;
                 showPage(currentPage);
             }
         }
