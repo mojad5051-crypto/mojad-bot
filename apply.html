@@ -363,7 +363,26 @@
             };
 
             const payload = {
-                embeds: [embed]
+                embeds: [embed],
+                components: [
+                    {
+                        type: 1,
+                        components: [
+                            {
+                                type: 2,
+                                style: 3,
+                                label: 'Accept',
+                                custom_id: `app_accept`
+                            },
+                            {
+                                type: 2,
+                                style: 4,
+                                label: 'Deny',
+                                custom_id: `app_deny`
+                            }
+                        ]
+                    }
+                ]
             };
 
             try {
