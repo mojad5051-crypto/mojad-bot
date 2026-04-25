@@ -59,10 +59,19 @@
             margin-top: 0.25rem;
         }
         .success {
-            color: #10b981;
-            font-size: 1.125rem;
+            display: none;
+            background-color: rgba(238, 246, 255, 0.95);
+            border: 1px solid #b6d4ff;
+            color: #0f172a;
+            font-size: 1rem;
             text-align: center;
+            padding: 1.5rem;
+            border-radius: 12px;
             margin-top: 1rem;
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.12);
+        }
+        .success.show {
+            display: block;
         }
     </style>
 </head>
@@ -207,8 +216,8 @@
             <div id="additional" class="card p-6" style="display: none;">
                 <h3 class="text-2xl font-semibold fading-green mb-4">Additional Information</h3>
                 <div>
-                    <label for="additional" class="block text-sm font-medium">Is there anything else you want to let us know? (If not, leave blank.)</label>
-                    <textarea id="additional" name="additional" rows="4" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
+                    <label for="additionalInfo" class="block text-sm font-medium">Is there anything else you want to let us know? (If not, leave blank.)</label>
+                    <textarea id="additionalInfo" name="additional" rows="4" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
                     <div id="warningAdditional" class="warning hidden"></div>
                     <div id="aiScoreAdditional" class="text-sm text-gray-500 mt-1"></div>
                 </div>
@@ -233,7 +242,7 @@
     <script>
         // Constants - Replace with your actual values
         const ZERO_GPT_API_KEY = '81dd18d5-2152-4fd7-8ef7-4029aa4885fb'; // Get from ZeroGPT
-        const WEBHOOK_URL = 'https://discord.com/api/webhooks/1497724360805584896/nQ8_fABqoh6kuO64GnKkEXx808xfqbCzKYgSyD9ROv_eswZLjn1OqdtfbTU6qbUwXhEe'; // This webhook must be created in channel 1497628703381917827 to post review embeds there
+        const WEBHOOK_URL = 'https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN'; // IMPORTANT: Create webhook in channel 1497628703381917827 and replace with actual URL
 
         // Autopaste detection
         const textareas = document.querySelectorAll('textarea');
@@ -289,7 +298,7 @@
             }
 
             // AI Detection on long answers
-            const longTextareas = [document.getElementById('scenario1'), document.getElementById('scenario2'), document.getElementById('scenario3'), document.getElementById('scenario4'), document.getElementById('additional')];
+            const longTextareas = [document.getElementById('scenario1'), document.getElementById('scenario2'), document.getElementById('scenario3'), document.getElementById('scenario4'), document.getElementById('additionalInfo')];
             const aiScores = {};
             for (let i = 0; i < longTextareas.length; i++) {
                 const textarea = longTextareas[i];
@@ -360,17 +369,24 @@
             };
 
             try {
-                await fetch(WEBHOOK_URL, {
+                const response = await fetch(WEBHOOK_URL + '?wait=true', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    document.getElementById('successMessage').textContent = `Submission failed: ${response.status} - ${errorText}`;
+                    document.getElementById('successMessage').classList.add('show');
+                    return;
+                }
                 document.getElementById('successMessage').textContent = 'Your application has been submitted successfully! Thank you for applying — our staff team will review it and contact you soon.';
-                document.getElementById('successMessage').classList.remove('hidden');
-                document.getElementById('applicationForm').reset();
+                document.getElementById('successMessage').classList.add('show');
+                document.getElementById('applicationForm').style.display = 'none';
             } catch (error) {
                 console.error('Submission error:', error);
-                alert('Submission failed. Please try again.');
+                document.getElementById('successMessage').textContent = 'Submission failed. Please try again later.';
+                document.getElementById('successMessage').classList.add('show');
             }
         });
     </script>
