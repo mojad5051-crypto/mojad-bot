@@ -20,15 +20,21 @@
     </script>
     <style>
         body {
-            background: linear-gradient(to bottom, #e0f6ff, #b3e5fc);
+            background: #ffffff;
             color: #333333;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .card {
-            background-color: #ffffff;
+            background: linear-gradient(to bottom, #00ffff, #0080ff);
             border: 1px solid #dddddd;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .fading-green {
+            background: linear-gradient(to right, #00ff00, #008000);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         .required::after {
             content: ' *';
@@ -51,8 +57,8 @@
     <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="card p-6 mb-8 text-center">
-            <h1 class="text-4xl font-bold text-purple mb-2">Moderator Application</h1>
-            <h2 class="text-xl text-discord mb-4">[Florida State Roleplay] Staff Team</h2>
+            <h1 class="text-4xl font-bold fading-green mb-2">Moderator Application</h1>
+            <h2 class="text-xl fading-green mb-4">[Florida State Roleplay] Staff Team</h2>
             <p class="text-gray-600 leading-relaxed">
                 Thank you for your interest in joining our moderator team. Please answer all questions honestly and in your own words. AI-generated or copy-pasted answers will be automatically flagged and may result in denial or blacklist.
             </p>
@@ -62,7 +68,7 @@
         <form id="applicationForm" autocomplete="off" class="card p-6 space-y-8">
             <!-- Personal Information -->
             <div>
-                <h3 class="text-2xl font-semibold text-purple mb-4">Personal Information</h3>
+                <h3 class="text-2xl font-semibold fading-green mb-4">Personal Information</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="robloxUsername" class="block text-sm font-medium required">Roblox Username</label>
@@ -82,7 +88,7 @@
 
             <!-- Knowledge Check -->
             <div>
-                <h3 class="text-2xl font-semibold text-purple mb-4">Knowledge Check</h3>
+                <h3 class="text-2xl font-semibold fading-green mb-4">Knowledge Check</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="rdm" class="block text-sm font-medium required">What does RDM stand for?</label>
@@ -109,7 +115,7 @@
 
             <!-- Scenario Questions -->
             <div>
-                <h3 class="text-2xl font-semibold text-purple mb-4">Scenario Questions</h3>
+                <h3 class="text-2xl font-semibold fading-green mb-4">Scenario Questions</h3>
                 <div class="space-y-4">
                     <div>
                         <label for="scenario1" class="block text-sm font-medium required">Little G shoots a car for fun. What is the appropriate punishment?</label>
@@ -140,7 +146,7 @@
 
             <!-- Agreement -->
             <div>
-                <h3 class="text-2xl font-semibold text-purple mb-4">Agreement</h3>
+                <h3 class="text-2xl font-semibold fading-green mb-4">Agreement</h3>
                 <div class="space-y-4">
                     <div>
                         <p class="text-sm font-medium required">Do you understand that the usage of AI (such as ChatGPT) on this application will result in an immediate staff blacklist?</p>
@@ -173,7 +179,7 @@
 
             <!-- Additional Information -->
             <div>
-                <h3 class="text-2xl font-semibold text-purple mb-4">Additional Information</h3>
+                <h3 class="text-2xl font-semibold fading-green mb-4">Additional Information</h3>
                 <div>
                     <label for="additional" class="block text-sm font-medium">Is there anything else you want to let us know? (If not, leave blank.)</label>
                     <textarea id="additional" name="additional" rows="4" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple focus:border-purple resize-vertical text-gray-900"></textarea>
