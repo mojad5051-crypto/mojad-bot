@@ -181,6 +181,19 @@ async def afk_command(interaction: discord.Interaction, reason: str = None):
         await interaction.response.send_message("You have been successfully set AFK.", ephemeral=True)
 
 
+@bot.tree.command(name="application", description="Get the link to the moderator application form")
+async def application_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Moderator Application",
+        description="Apply to become a moderator in Florida State Roleplay.\n\nClick the button below to fill out the application form.",
+        color=0x9b59b6,
+    )
+    embed.set_footer(text="Florida State Roleplay • Application System")
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="Apply Now", style=discord.ButtonStyle.link, url="https://mojad5051-crypto.github.io/mojad/apply.html"))
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
 @bot.event
 async def on_interaction(interaction: discord.Interaction) -> None:
     if interaction.type != discord.InteractionType.component:
