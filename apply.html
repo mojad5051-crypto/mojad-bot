@@ -29,6 +29,11 @@
             border: 1px solid #e2e8f0;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
         }
         .fading-green {
             color: #38a169;
@@ -63,9 +68,9 @@
         </div>
 
         <!-- Form -->
-        <form id="applicationForm" autocomplete="off" class="card p-6 space-y-8">
+        <form id="applicationForm" autocomplete="off" class="space-y-6">
             <!-- Personal Information -->
-            <div>
+            <div class="card p-6">
                 <h3 class="text-2xl font-semibold fading-green mb-4">Personal Information</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -85,7 +90,7 @@
             </div>
 
             <!-- Knowledge Check -->
-            <div>
+            <div class="card p-6">
                 <h3 class="text-2xl font-semibold fading-green mb-4">Knowledge Check</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -112,7 +117,7 @@
             </div>
 
             <!-- Scenario Questions -->
-            <div>
+            <div class="card p-6">
                 <h3 class="text-2xl font-semibold fading-green mb-4">Scenario Questions</h3>
                 <div class="space-y-4">
                     <div>
@@ -143,7 +148,7 @@
             </div>
 
             <!-- Agreement -->
-            <div>
+            <div class="card p-6">
                 <h3 class="text-2xl font-semibold fading-green mb-4">Agreement</h3>
                 <div class="space-y-4">
                     <div>
@@ -163,11 +168,11 @@
                         <p class="text-sm font-medium required">Do you understand that if you ask for your application to be reviewed or rushed, it will result in an automatic denial?</p>
                         <div class="mt-2 space-x-4">
                             <label class="inline-flex items-center">
-                                <input type="radio" name="rushAgreement" value="yes" required class="text-purple focus:ring-purple">
+                                <input type="radio" name="rushAgreement" value="yes" required class="text-green-600 focus:ring-green-500">
                                 <span class="ml-2">Yes</span>
                             </label>
                             <label class="inline-flex items-center">
-                                <input type="radio" name="rushAgreement" value="no" required class="text-purple focus:ring-purple">
+                                <input type="radio" name="rushAgreement" value="no" required class="text-green-600 focus:ring-green-500">
                                 <span class="ml-2">No</span>
                             </label>
                         </div>
@@ -176,7 +181,7 @@
             </div>
 
             <!-- Additional Information -->
-            <div>
+            <div class="card p-6">
                 <h3 class="text-2xl font-semibold fading-green mb-4">Additional Information</h3>
                 <div>
                     <label for="additional" class="block text-sm font-medium">Is there anything else you want to let us know? (If not, leave blank.)</label>
@@ -187,7 +192,7 @@
             </div>
 
             <!-- Submit Button -->
-            <div class="text-center">
+            <div class="card p-6 text-center">
                 <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-200">Submit Application</button>
             </div>
         </form>
