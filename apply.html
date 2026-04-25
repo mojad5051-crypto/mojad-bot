@@ -194,7 +194,7 @@
     <script>
         // Constants - Replace with your actual values
         const ZERO_GPT_API_KEY = '81dd18d5-2152-4fd7-8ef7-4029aa4885fb'; // Get from ZeroGPT
-        const WEBHOOK_URL = 'https://discord.com/api/webhooks/1497724360805584896/nQ8_fABqoh6kuO64GnKkEXx808xfqbCzKYgSyD9ROv_eswZLjn1OqdtfbTU6qbUwXhEe'; // Create a webhook in your Discord server
+        const WEBHOOK_URL = 'https://discord.com/api/webhooks/1497724360805584896/nQ8_fABqoh6kuO64GnKkEXx808xfqbCzKYgSyD9ROv_eswZLjn1OqdtfbTU6qbUwXhEe'; // Use a webhook created in channel 1497628703381917827
 
         // Autopaste detection
         const textareas = document.querySelectorAll('textarea');
@@ -292,7 +292,7 @@
                     { name: 'AI Agreement', value: data.aiAgreement, inline: true },
                     { name: 'Rush Agreement', value: data.rushAgreement, inline: true },
                     { name: 'Additional Info', value: data.additional || 'None' },
-                    { name: 'AI Scores', value: Object.entries(aiScores).map(([k, v]) => `${k}: ${v}%`).join('\n') || 'None' },
+                    { name: 'AI Detection', value: Object.entries(aiScores).map(([k, v]) => `${k}: ${v}%`).join('\n') || 'None' },
                     { name: 'Paste Warnings', value: data.pasteWarnings.join(', ') || 'None' }
                 ]
             };
