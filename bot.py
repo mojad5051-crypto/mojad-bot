@@ -213,6 +213,79 @@ async def on_interaction(interaction: discord.Interaction) -> None:
         await bot.get_cog("ApplicationCog").open_verify_modal(interaction)
         return
 
+    if interaction.data.get("custom_id") in {"app_accept", "app_deny"}:
+        member = interaction.user if isinstance(interaction.user, discord.Member) else None
+        if member is None or not any(role.id == bot.config["staff_role_id"] for role in member.roles):
+            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
+            return
+
+        embed = interaction.message.embeds[0] if interaction.message.embeds else None
+        if embed is None:
+            await interaction.response.send_message("Unable to process this application message.", ephemeral=True)
+            return
+
+        discord_username = None
+        for field in embed.fields:
+            if field.name == 'Discord Username':
+                discord_username = field.value
+                break
+
+        target_member = None
+        if discord_username:
+            guild = interaction.guild
+            if guild:
+                if discord_username.isdigit() and 17 <= len(discord_username) <= 19:
+                    target_member = guild.get_member(int(discord_username))
+                if target_member is None and '#' in discord_username:
+                    name, discrim = discord_username.split('#', 1)
+                    for m in guild.members:
+                        if m.name == name and m.discriminator == discrim:
+                            target_member = m
+                            break
+                if target_member is None:
+                    for m in guild.members:
+                        if m.name == discord_username or str(m) == discord_username:
+                            target_member = m
+                            break
+
+        status = 'Accepted' if interaction.data.get('custom_id') == 'app_accept' else 'Denied'
+        color = 0x2ecc71 if status == 'Accepted' else 0xe74c3c
+        result_description = f"This application has been {status.lower()} by {interaction.user.mention}."
+
+        if target_member is not None:
+            try:
+                if status == 'Accepted':
+                    role = interaction.guild.get_role(1496970734919094303)
+                    if role:
+                        await target_member.add_roles(role, reason='Moderator application accepted')
+                    await target_member.send(
+                        "Congratulations! Your moderator application has been accepted for Florida State Roleplay. Welcome to the team! Please be ready for next steps and review your staff duties."
+                    )
+                else:
+                    await target_member.send(
+                        "We are sorry, but your moderator application has been denied. Please keep playing and feel free to reapply in the future after gaining more experience."
+                    )
+            except Exception as e:
+                print('DM/role error:', e)
+
+        new_embed = discord.Embed(
+            title=embed.title,
+            description=f"{embed.description}\n\n**Review decision:** {status}",
+            color=color,
+        )
+        for field in embed.fields:
+            new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+        new_embed.set_footer(text=embed.footer.text if embed.footer else "")
+        new_embed.timestamp = embed.timestamp
+
+        disabled_view = discord.ui.View()
+        disabled_view.add_item(discord.ui.Button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept', disabled=True))
+        disabled_view.add_item(discord.ui.Button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny', disabled=True))
+
+        await interaction.message.edit(embed=new_embed, view=disabled_view)
+        await interaction.response.send_message(f"Application {status.lower()} successfully.", ephemeral=True)
+        return
+
 
 if __name__ == "__main__":
     bot.run(config["token"])

@@ -69,8 +69,9 @@
                         <input type="text" id="robloxUsername" name="robloxUsername" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple focus:border-purple">
                     </div>
                     <div>
-                        <label for="discordUsername" class="block text-sm font-medium required">Discord Username</label>
-                        <input type="text" id="discordUsername" name="discordUsername" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple focus:border-purple">
+                        <label for="discordUsername" class="block text-sm font-medium required">Discord Username or ID</label>
+                        <input type="text" id="discordUsername" name="discordUsername" placeholder="Username#1234 or numeric ID" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple focus:border-purple">
+                        <p class="text-xs text-gray-500 mt-1">Provide your full Discord tag or numeric ID so staff can send a direct message.</p>
                     </div>
                 </div>
                 <div class="mt-4">
@@ -296,11 +297,34 @@
                 ]
             };
 
+            const payload = {
+                embeds: [embed],
+                components: [
+                    {
+                        type: 1,
+                        components: [
+                            {
+                                type: 2,
+                                style: 3,
+                                label: 'Accept',
+                                custom_id: `app_accept`
+                            },
+                            {
+                                type: 2,
+                                style: 4,
+                                label: 'Deny',
+                                custom_id: `app_deny`
+                            }
+                        ]
+                    }
+                ]
+            };
+
             try {
                 await fetch(WEBHOOK_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ embeds: [embed] })
+                    body: JSON.stringify(payload)
                 });
                 document.getElementById('successMessage').textContent = 'Application submitted successfully! We will review it soon.';
                 document.getElementById('successMessage').classList.remove('hidden');
