@@ -231,7 +231,7 @@
             <div id="submit" class="card p-6 text-center" style="display: none;">
                 <div class="flex items-center justify-center gap-3">
                     <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
-                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-200">Submit Application</button>
+                    <button type="submit" id="submitBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-200">Submit Application</button>
                 </div>
             </div>
         </form>
@@ -282,10 +282,17 @@
         document.getElementById('applicationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            // Disable button and show submitting
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
             // Basic validation
             const age = parseInt(document.getElementById('age').value);
             if (age < 13) {
                 alert('You must be at least 13 years old.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
                 return;
             }
 
@@ -293,6 +300,8 @@
             for (let field of requiredFields) {
                 if (!field.value.trim()) {
                     alert('Please fill in all required fields.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Application';
                     return;
                 }
             }
@@ -310,6 +319,9 @@
                     document.getElementById(scoreId).textContent = `AI Score: ${score}%`;
                     if (score > 70) {
                         alert(`High AI score detected on ${textarea.name}. Please ensure your answer is original.`);
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit Application';
+                        return;
                     }
                 }
             }
@@ -364,6 +376,8 @@
                     const errorText = await response.text();
                     document.getElementById('successMessage').textContent = `Submission failed: ${response.status} - ${errorText}`;
                     document.getElementById('successMessage').classList.add('show');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Application';
                     return;
                 }
                 document.getElementById('successMessage').textContent = 'Your application has been submitted successfully! Thank you for applying — our staff team will review it and contact you soon.';
@@ -373,6 +387,8 @@
                 console.error('Submission error:', error);
                 document.getElementById('successMessage').textContent = 'Submission failed. Please try again later.';
                 document.getElementById('successMessage').classList.add('show');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
             }
         });
     </script>
