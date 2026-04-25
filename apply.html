@@ -322,8 +322,9 @@
 
             // Send to Discord webhook
             const embed = {
-                title: 'New Moderator Application',
-                color: 0x9b59b6, // Purple
+                title: 'Moderator Application Submission',
+                description: 'A new moderator application has been submitted. Please review the details below.',
+                color: 0x1e40af, // Blue to match theme
                 fields: [
                     { name: 'Roblox Username', value: data.robloxUsername, inline: true },
                     { name: 'Discord Username', value: data.discordUsername, inline: true },
@@ -342,30 +343,15 @@
                     { name: 'Additional Info', value: data.additional || 'None' },
                     { name: 'AI Detection', value: Object.entries(aiScores).map(([k, v]) => `${k}: ${v}%`).join('\n') || 'None' },
                     { name: 'Paste Warnings', value: data.pasteWarnings.join(', ') || 'None' }
-                ]
+                ],
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'Florida State Roleplay • Application System'
+                }
             };
 
             const payload = {
-                embeds: [embed],
-                components: [
-                    {
-                        type: 1,
-                        components: [
-                            {
-                                type: 2,
-                                style: 3,
-                                label: 'Accept',
-                                custom_id: `app_accept`
-                            },
-                            {
-                                type: 2,
-                                style: 4,
-                                label: 'Deny',
-                                custom_id: `app_deny`
-                            }
-                        ]
-                    }
-                ]
+                embeds: [embed]
             };
 
             try {

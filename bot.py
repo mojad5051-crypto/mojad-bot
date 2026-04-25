@@ -74,6 +74,20 @@ class FloridaRPBot(commands.Bot):
         logging.info("Connected to guild %s", self.config["guild_id"])
 
     async def on_message(self, message):
+        # Handle webhook application submissions
+        if (message.channel.id == self.config["review_channel_id"] and 
+            message.webhook_id and 
+            message.embeds and 
+            len(message.embeds) > 0 and 
+            message.embeds[0].title == 'Moderator Application Submission'):
+            embed = message.embeds[0]
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept'))
+            view.add_item(discord.ui.Button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny'))
+            await message.delete()
+            await message.channel.send(embed=embed, view=view)
+            return
+
         if message.author.bot:
             return
         if message.author.id in self.afk_users:
