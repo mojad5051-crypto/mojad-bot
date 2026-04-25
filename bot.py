@@ -98,7 +98,7 @@ bot = FloridaRPBot(config)
 
 embed_group = app_commands.Group(name="embed", description="Embed commands")
 
-@embed_group.command(name="application", description="Create a moderator application embed with a website link")
+@embed_group.command(name="aplication", description="Create a moderator application embed with a website link")
 @app_commands.checks.has_permissions(administrator=True)
 async def application_embed(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -109,7 +109,7 @@ async def application_embed(interaction: discord.Interaction):
     embed.set_footer(text="Florida State Roleplay • Application System")
     view = discord.ui.View()
     view.add_item(discord.ui.Button(label="Apply Now", style=discord.ButtonStyle.link, url="https://mojad5051-crypto.github.io/mojad/apply.html"))
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    await interaction.response.send_message(embed=embed, view=view)
 
 bot.tree.add_command(embed_group)
 
