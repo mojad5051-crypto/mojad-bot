@@ -130,12 +130,12 @@ class ApplicationReviewView(discord.ui.View):
                             break
 
                 if target_member:
-                    # Use the moderator role ID from config (should be different from staff_role_id)
-                    moderator_role_id = 1496970697430536489  # The role to assign to accepted applicants
+                    # Use the moderator role ID from environment variable
+                    moderator_role_id = int(os.getenv('MODERATOR_ROLE_ID', '1496970734919094303'))
                     role = guild.get_role(moderator_role_id)
                     if role:
                         await target_member.add_roles(role, reason='Moderator application accepted')
-                        logging.info(f"Added moderator role to {target_member}")
+                        logging.info(f"Added moderator role {moderator_role_id} to {target_member}")
                     else:
                         logging.error(f"Could not find moderator role with ID {moderator_role_id}")
                     
