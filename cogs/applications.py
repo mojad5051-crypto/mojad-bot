@@ -3,16 +3,6 @@ from discord.ext import commands
 
 
 class ApplicationModal(discord.ui.Modal, title="Staff Application"):
-    age = discord.ui.TextInput(label="Age", placeholder="Your age", required=True)
-    experience = discord.ui.TextInput(label="Experience", style=discord.TextStyle.paragraph, placeholder="Your past roleplay or staff experience", required=True)
-    availability = discord.ui.TextInput(label="Availability", placeholder="Days and times you are available", required=True)
-    motivation = discord.ui.TextInput(label="Why should we accept you?", style=discord.TextStyle.paragraph, placeholder="Tell us why you want to join staff", required=True)
-
-    def __init__(self, bot: commands.Bot):
-        super().__init__()
-        self.bot = bot
-
-    async def on_submit(self, interaction: discord.Interaction) -> None:
         db = self.bot.db
         application_id = db.add_application(
             user_id=interaction.user.id,

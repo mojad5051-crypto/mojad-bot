@@ -6,6 +6,7 @@ from pathlib import Path
 import discord
 from discord import app_commands
 from discord.ext import commands
+from aiohttp import web
 from dotenv import load_dotenv
 
 from db import Database
@@ -36,6 +37,7 @@ def load_config() -> dict:
     config["embed_color"] = int(os.getenv("EMBED_COLOR", "1973790"))
     config["panel_banner_url"] = os.getenv("PANEL_BANNER_URL", "")
     config["logo_url"] = os.getenv("LOGO_URL", "")
+    config["port"] = int(os.getenv("PORT", "8080"))
     
     return config
 
@@ -52,6 +54,167 @@ def get_intents() -> discord.Intents:
     return intents
 
 
+class ApplicationReviewView(discord.ui.View):
+    """Persistent view for application accept/deny buttons"""
+    def __init__(self, bot: 'FloridaRPBot'):
+        super().__init__(timeout=None)
+        self.bot = bot
+
+    @discord.ui.button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept')
+    async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        logging.info(f"Accept button clicked by {interaction.user} ({interaction.user.id})")
+        logging.info(f"Interaction type: {type(interaction)}, Message: {interaction.message.id if interaction.message else 'None'}")
+        
+        guild = interaction.guild
+        if guild is None:
+            logging.warning("No guild found for interaction")
+            await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
+            return
+
+        member = guild.get_member(interaction.user.id)
+        staff_role_id = self.bot.config.get('staff_role_id')
+        logging.info(f"Staff role ID: {staff_role_id}, Member: {member}, Member roles: {[role.id for role in member.roles] if member else 'None'}")
+        
+        if member is None:
+            logging.warning("Member not found in guild")
+            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
+            return
+            
+        has_role = any(role.id == staff_role_id for role in member.roles)
+        logging.info(f"Has staff role: {has_role}")
+        
+        if not has_role:
+            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
+            return
+
+        if interaction.message.embeds and '**Review decision:**' in interaction.message.embeds[0].description:
+            await interaction.response.send_message("This application has already been reviewed.", ephemeral=True)
+            return
+
+        embed = interaction.message.embeds[0]
+        new_embed = discord.Embed(
+            title=embed.title,
+            description=f"{embed.description}\n\n**Review decision:** Accepted",
+            color=0x2ecc71,
+        )
+        for field in embed.fields:
+            new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+        new_embed.set_footer(text=embed.footer.text if embed.footer else None)
+        new_embed.timestamp = embed.timestamp
+
+        await interaction.response.defer()
+        await interaction.message.edit(embed=new_embed, view=None)
+        logging.info("Successfully updated embed for acceptance")
+
+        discord_username = None
+        for field in embed.fields:
+            if field.name == 'Discord Username':
+                discord_username = field.value
+                break
+
+        if discord_username:
+            try:
+                target_member = None
+                if discord_username.isdigit():
+                    target_member = guild.get_member(int(discord_username))
+                if target_member is None and '#' in discord_username:
+                    name, discrim = discord_username.split('#', 1)
+                    for m in guild.members:
+                        if m.name == name and m.discriminator == discrim:
+                            target_member = m
+                            break
+                if target_member is None:
+                    for m in guild.members:
+                        if m.name == discord_username or str(m) == discord_username:
+                            target_member = m
+                            break
+
+                if target_member:
+                    role = guild.get_role(1496970734919094303)
+                    if role:
+                        await target_member.add_roles(role, reason='Moderator application accepted')
+                        logging.info(f"Added role to {target_member}")
+                    await target_member.send('Congratulations! Your moderator application has been accepted for Florida State Roleplay. Welcome to the team!')
+                    logging.info(f"Sent DM to {target_member}")
+            except Exception as e:
+                logging.exception('Failed to process acceptance: %s', e)
+
+    @discord.ui.button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny')
+    async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        logging.info(f"Deny button clicked by {interaction.user} ({interaction.user.id})")
+        logging.info(f"Interaction type: {type(interaction)}, Message: {interaction.message.id if interaction.message else 'None'}")
+        
+        guild = interaction.guild
+        if guild is None:
+            logging.warning("No guild found for interaction")
+            await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
+            return
+
+        member = guild.get_member(interaction.user.id)
+        staff_role_id = self.bot.config.get('staff_role_id')
+        logging.info(f"Staff role ID: {staff_role_id}, Member: {member}, Member roles: {[role.id for role in member.roles] if member else 'None'}")
+        
+        if member is None:
+            logging.warning("Member not found in guild")
+            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
+            return
+            
+        has_role = any(role.id == staff_role_id for role in member.roles)
+        logging.info(f"Has staff role: {has_role}")
+        
+        if not has_role:
+            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
+            return
+
+        if interaction.message.embeds and '**Review decision:**' in interaction.message.embeds[0].description:
+            await interaction.response.send_message("This application has already been reviewed.", ephemeral=True)
+            return
+
+        embed = interaction.message.embeds[0]
+        new_embed = discord.Embed(
+            title=embed.title,
+            description=f"{embed.description}\n\n**Review decision:** Denied",
+            color=0xe74c3c,
+        )
+        for field in embed.fields:
+            new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+        new_embed.set_footer(text=embed.footer.text if embed.footer else None)
+        new_embed.timestamp = embed.timestamp
+
+        await interaction.response.defer()
+        await interaction.message.edit(embed=new_embed, view=None)
+        logging.info("Successfully updated embed for denial")
+
+        discord_username = None
+        for field in embed.fields:
+            if field.name == 'Discord Username':
+                discord_username = field.value
+                break
+
+        if discord_username:
+            try:
+                target_member = None
+                if discord_username.isdigit():
+                    target_member = guild.get_member(int(discord_username))
+                if target_member is None and '#' in discord_username:
+                    name, discrim = discord_username.split('#', 1)
+                    for m in guild.members:
+                        if m.name == name and m.discriminator == discrim:
+                            target_member = m
+                            break
+                if target_member is None:
+                    for m in guild.members:
+                        if m.name == discord_username or str(m) == discord_username:
+                            target_member = m
+                            break
+
+                if target_member:
+                    await target_member.send('We are sorry, but your moderator application has been denied. Please reapply in the future.')
+                    logging.info(f"Sent denial DM to {target_member}")
+            except Exception as e:
+                logging.exception('Failed to process denial: %s', e)
+
+
 class FloridaRPBot(commands.Bot):
     def __init__(self, config: dict):
         super().__init__(command_prefix="!", intents=get_intents(), application_id=config.get("application_id"))
@@ -61,20 +224,110 @@ class FloridaRPBot(commands.Bot):
         self.tree.on_error = self.on_app_command_error
 
     async def setup_hook(self) -> None:
+        logging.info("Setting up bot cogs and views...")
         await self.add_cog(ModerationCog(self))
         await self.add_cog(ApplicationCog(self))
         await self.add_cog(TrainingCog(self))
         self.add_view(TrainingShoutView())
+        self.add_view(ApplicationReviewView(self))
+        logging.info("ApplicationReviewView registered")
         guild = discord.Object(id=self.config["guild_id"])
         self.tree.clear_commands(guild=guild)
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
+        await self.start_web_server()
 
     async def on_ready(self) -> None:
         logging.info("Logged in as %s (%s)", self.user, self.user.id)
         logging.info("Connected to guild %s", self.config["guild_id"])
 
-    async def on_raw_message_create(self, payload: discord.RawMessageCreateEvent) -> None:
+    async def start_web_server(self) -> None:
+        async def handle_apply(request: web.Request) -> web.Response:
+            logging.info("Received application submission request")
+            try:
+                data = await request.json()
+                logging.info(f"Application data received: {list(data.keys())}")
+            except Exception:
+                logging.exception("Failed to parse JSON")
+                return web.json_response({"success": False, "error": "Invalid JSON"}, status=400)
+
+            required_fields = [
+                "robloxUsername",
+                "discordUsername",
+                "age",
+                "rdm",
+                "vdm",
+                "nlr",
+                "nitrp",
+                "aama",
+                "scenario1",
+                "scenario2",
+                "scenario3",
+                "scenario4",
+                "aiAgreement",
+                "rushAgreement"
+            ]
+            for field in required_fields:
+                if not data.get(field):
+                    return web.json_response({"success": False, "error": f"Missing field: {field}"}, status=400)
+
+            review_channel = self.get_channel(self.config["review_channel_id"]) or await self.fetch_channel(self.config["review_channel_id"])
+            if review_channel is None:
+                return web.json_response({"success": False, "error": "Review channel not found"}, status=500)
+
+            embed = discord.Embed(
+                title="Moderator Application Submission",
+                description="A new moderator application has been submitted. Staff can review using the buttons below.",
+                color=self.config.get("embed_color", 0x1e40af),
+                timestamp=discord.utils.utcnow()
+            )
+            embed.add_field(name="Roblox Username", value=data["robloxUsername"], inline=True)
+            embed.add_field(name="Discord Username", value=data["discordUsername"], inline=True)
+            embed.add_field(name="Age", value=data["age"], inline=True)
+            embed.add_field(name="RDM", value=data["rdm"], inline=True)
+            embed.add_field(name="VDM", value=data["vdm"], inline=True)
+            embed.add_field(name="NLR", value=data["nlr"], inline=True)
+            embed.add_field(name="NITRP", value=data["nitrp"], inline=True)
+            embed.add_field(name="AA/MA", value=data["aama"], inline=True)
+            embed.add_field(name="Scenario 1", value=data["scenario1"], inline=False)
+            embed.add_field(name="Scenario 2", value=data["scenario2"], inline=False)
+            embed.add_field(name="Scenario 3", value=data["scenario3"], inline=False)
+            embed.add_field(name="Scenario 4", value=data["scenario4"], inline=False)
+            embed.add_field(name="AI Agreement", value=data["aiAgreement"], inline=True)
+            embed.add_field(name="Rush Agreement", value=data["rushAgreement"], inline=True)
+            embed.add_field(name="Additional Info", value=data.get("additional") or "None", inline=False)
+            embed.add_field(name="Paste Warnings", value=", ".join(data.get("pasteWarnings", [])) or "None", inline=False)
+            embed.set_footer(text="Florida State Roleplay • Application System")
+
+            view = ApplicationReviewView(self)
+            logging.info(f"Created ApplicationReviewView for application submission")
+
+            try:
+                message = await review_channel.send(embed=embed, view=view)
+                logging.info(f"Successfully sent application embed with message ID: {message.id}")
+            except Exception as exc:
+                logging.exception('Failed to send application embed: %s', exc)
+                return web.json_response({"success": False, "error": "Failed to send application embed"}, status=500)
+
+            return web.json_response({"success": True})
+
+        async def handle_options(request: web.Request) -> web.Response:
+            return web.Response(status=204, headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            })
+
+        app = web.Application()
+        app.router.add_post("/apply", handle_apply)
+        app.router.add_options("/apply", handle_options)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.config["port"])
+        await site.start()
+        logging.info("Web server running on port %s", self.config["port"])
+
+    async def on_raw_message_create(self, payload) -> None:
         if not payload.webhook_id:
             return
         embeds = payload.data.get('embeds', [])

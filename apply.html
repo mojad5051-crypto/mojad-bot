@@ -235,14 +235,14 @@
     </div>
 
     <script>
-        // Constants - Replace with your actual values
-        const WEBHOOK_URL = 'https://discord.com/api/webhooks/1497724360805584896/nQ8_fABqoh6kuO64GnKkEXx808xfqbCzKYgSyD9ROv_eswZLjn1OqdtfbTU6qbUwXhEe'; // IMPORTANT: Ensure this webhook is created in channel 1497628703381917827
+        // Constants - Replace with your actual deployed bot URL
+        const API_URL = 'https://mojad-bot.railway.app/apply'; // Updated to your deployed bot URL
 
         // Autopaste detection
         const textareas = document.querySelectorAll('textarea');
         const pastedFields = new Set();
-        textareas.forEach((textarea, index) => {
-            textarea.addEventListener('paste', (e) => {
+        textareas.forEach((textarea) => {
+            textarea.addEventListener('paste', () => {
                 pastedFields.add(textarea.id);
             });
         });
@@ -280,7 +280,7 @@
             const data = Object.fromEntries(formData);
             data.pasteWarnings = Array.from(pastedFields);
 
-            // Send to Discord webhook
+            // Send to bot endpoint for Discord embed creation
             const embed = {
                 title: 'Moderator Application Submission',
                 description: 'A new moderator application has been submitted. Staff review with ✅ to accept or ❌ to deny.',
@@ -311,30 +311,26 @@
             };
 
             const payload = {
-                embeds: [embed],
-                components: [
-                    {
-                        type: 1,
-                        components: [
-                            {
-                                type: 2,
-                                style: 3,
-                                label: 'Accept',
-                                custom_id: 'app_accept'
-                            },
-                            {
-                                type: 2,
-                                style: 4,
-                                label: 'Deny',
-                                custom_id: 'app_deny'
-                            }
-                        ]
-                    }
-                ]
+                robloxUsername: data.robloxUsername,
+                discordUsername: data.discordUsername,
+                age: data.age,
+                rdm: data.rdm,
+                vdm: data.vdm,
+                nlr: data.nlr,
+                nitrp: data.nitrp,
+                aama: data.aama,
+                scenario1: data.scenario1,
+                scenario2: data.scenario2,
+                scenario3: data.scenario3,
+                scenario4: data.scenario4,
+                aiAgreement: data.aiAgreement,
+                rushAgreement: data.rushAgreement,
+                additional: data.additional,
+                pasteWarnings: Array.from(pastedFields)
             };
 
             try {
-                const response = await fetch(WEBHOOK_URL + '?wait=true', {
+                const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
