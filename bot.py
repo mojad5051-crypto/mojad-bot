@@ -74,18 +74,26 @@ class FloridaRPBot(commands.Bot):
         logging.info("Connected to guild %s", self.config["guild_id"])
 
     async def on_message(self, message):
-        # Handle webhook application submissions
-        if (message.channel.id == self.config["review_channel_id"] and 
-            message.webhook_id and 
-            message.embeds and 
-            len(message.embeds) > 0 and 
-            message.embeds[0].title == 'Moderator Application Submission'):
+        # Handle webhook application submissions and repost them as bot messages with buttons
+        if (
+            message.channel.id == self.config["review_channel_id"] and
+            message.webhook_id and
+            message.embeds and
+            len(message.embeds) > 0 and
+            message.embeds[0].title in {'Moderator Application Submission', 'New Moderator Application'}
+        ):
             embed = message.embeds[0]
-            view = discord.ui.View()
+            view = discord.ui.View(timeout=None)
             view.add_item(discord.ui.Button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept'))
             view.add_item(discord.ui.Button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny'))
-            await message.delete()
-            await message.channel.send(embed=embed, view=view)
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            try:
+                await message.channel.send(embed=embed, view=view)
+            except Exception as exc:
+                logging.exception('Failed to repost webhook embed with buttons: %s', exc)
             return
 
         if message.author.bot:
