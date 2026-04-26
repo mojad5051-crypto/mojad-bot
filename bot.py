@@ -47,6 +47,7 @@ def get_intents() -> discord.Intents:
     intents.guilds = True
     intents.messages = True
     intents.members = True
+    intents.reactions = True
     intents.message_content = True
     return intents
 
@@ -89,18 +90,11 @@ class FloridaRPBot(commands.Bot):
                 channel = await self.fetch_channel(payload.channel_id)
             if channel is None:
                 return
-            embed = discord.Embed.from_dict(embeds[0])
-            view = discord.ui.View(timeout=None)
-            view.add_item(discord.ui.Button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept'))
-            view.add_item(discord.ui.Button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny'))
-            await channel.send(embed=embed, view=view)
-            try:
-                message = await channel.fetch_message(payload.message_id)
-                await message.delete()
-            except Exception:
-                pass
+            message = await channel.fetch_message(payload.message_id)
+            await message.add_reaction('✅')
+            await message.add_reaction('❌')
         except Exception as exc:
-            logging.exception('Failed to repost webhook embed with buttons in raw event: %s', exc)
+            logging.exception('Failed to add review reactions to webhook application: %s', exc)
 
     async def on_message(self, message):
         if message.webhook_id:
@@ -114,6 +108,94 @@ class FloridaRPBot(commands.Bot):
             else:
                 await message.channel.send(f"Welcome back, {message.author.mention}!")
         await self.process_commands(message)
+
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
+        if payload.user_id == self.user.id:
+            return
+        if payload.emoji.name not in {'✅', '❌'}:
+            return
+
+        try:
+            channel = self.get_channel(payload.channel_id) or await self.fetch_channel(payload.channel_id)
+            if channel is None:
+                return
+            message = await channel.fetch_message(payload.message_id)
+            if not message.embeds:
+                return
+            embed = message.embeds[0]
+            if embed.title not in {'Moderator Application Submission', 'New Moderator Application'}:
+                return
+
+            guild = message.guild
+            if guild is None:
+                return
+            member = guild.get_member(payload.user_id)
+            if member is None or not any(role.id == self.config['staff_role_id'] for role in member.roles):
+                try:
+                    await message.remove_reaction(payload.emoji.name, discord.Object(id=payload.user_id))
+                except Exception:
+                    pass
+                return
+
+            if embed.description and '**Review decision:**' in embed.description:
+                return
+
+            status = 'Accepted' if payload.emoji.name == '✅' else 'Denied'
+            color = 0x2ecc71 if status == 'Accepted' else 0xe74c3c
+            new_embed = discord.Embed(
+                title=embed.title,
+                description=f"{embed.description}\n\n**Review decision:** {status}",
+                color=color,
+            )
+            for field in embed.fields:
+                new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+            new_embed.set_footer(text=embed.footer.text if embed.footer else None)
+            new_embed.timestamp = embed.timestamp
+            await message.edit(embed=new_embed)
+            try:
+                await message.clear_reactions()
+            except Exception:
+                pass
+
+            discord_username = None
+            for field in embed.fields:
+                if field.name == 'Discord Username':
+                    discord_username = field.value
+                    break
+
+            target_member = None
+            if discord_username:
+                if discord_username.isdigit():
+                    target_member = guild.get_member(int(discord_username))
+                if target_member is None and '#' in discord_username:
+                    name, discrim = discord_username.split('#', 1)
+                    for m in guild.members:
+                        if m.name == name and m.discriminator == discrim:
+                            target_member = m
+                            break
+                if target_member is None:
+                    for m in guild.members:
+                        if m.name == discord_username or str(m) == discord_username:
+                            target_member = m
+                            break
+
+            if target_member is not None:
+                try:
+                    if status == 'Accepted':
+                        role = guild.get_role(1496970734919094303)
+                        if role:
+                            await target_member.add_roles(role, reason='Moderator application accepted')
+                        await target_member.send(
+                            'Congratulations! Your moderator application has been accepted for Florida State Roleplay. Welcome to the team! Please be ready for next steps and review your staff duties.'
+                        )
+                    else:
+                        await target_member.send(
+                            'We are sorry, but your moderator application has been denied. Please keep playing and feel free to reapply in the future after gaining more experience.'
+                        )
+                except Exception as e:
+                    logging.exception('DM/role error: %s', e)
+        except Exception as exc:
+            logging.exception('Failed processing staff reaction on application: %s', exc)
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         if isinstance(error, app_commands.MissingPermissions):

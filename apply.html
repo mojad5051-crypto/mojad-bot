@@ -148,25 +148,21 @@
                         <label for="scenario1" class="block text-sm font-medium required">Little G shoots a car for fun. What is the appropriate punishment?</label>
                         <textarea id="scenario1" name="scenario1" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
                         <div id="warning1" class="warning hidden"></div>
-                        <div id="aiScore1" class="text-sm text-gray-500 mt-1"></div>
                     </div>
                     <div>
                         <label for="scenario2" class="block text-sm font-medium required">Little B shoots a guy and kills him for fun. What is his punishment?</label>
                         <textarea id="scenario2" name="scenario2" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
                         <div id="warning2" class="warning hidden"></div>
-                        <div id="aiScore2" class="text-sm text-gray-500 mt-1"></div>
                     </div>
                     <div>
                         <label for="scenario3" class="block text-sm font-medium required">If you see a moderator abusing their power, what will you do?</label>
                         <textarea id="scenario3" name="scenario3" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
                         <div id="warning3" class="warning hidden"></div>
-                        <div id="aiScore3" class="text-sm text-gray-500 mt-1"></div>
                     </div>
                     <div>
                         <label for="scenario4" class="block text-sm font-medium required">If you see a player breaking Roblox ToS, what do you do?</label>
                         <textarea id="scenario4" name="scenario4" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
                         <div id="warning4" class="warning hidden"></div>
-                        <div id="aiScore4" class="text-sm text-gray-500 mt-1"></div>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 mt-4">
@@ -219,7 +215,6 @@
                     <label for="additionalInfo" class="block text-sm font-medium">Is there anything else you want to let us know? (If not, leave blank.)</label>
                     <textarea id="additionalInfo" name="additional" rows="4" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
                     <div id="warningAdditional" class="warning hidden"></div>
-                    <div id="aiScoreAdditional" class="text-sm text-gray-500 mt-1"></div>
                 </div>
                 <div class="flex items-center gap-3 mt-4">
                     <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
@@ -241,7 +236,6 @@
 
     <script>
         // Constants - Replace with your actual values
-        const ZERO_GPT_API_KEY = '81dd18d5-2152-4fd7-8ef7-4029aa4885fb'; // Get from ZeroGPT
         const WEBHOOK_URL = 'https://discord.com/api/webhooks/1497724360805584896/nQ8_fABqoh6kuO64GnKkEXx808xfqbCzKYgSyD9ROv_eswZLjn1OqdtfbTU6qbUwXhEe'; // IMPORTANT: Ensure this webhook is created in channel 1497628703381917827
 
         // Autopaste detection
@@ -252,65 +246,6 @@
                 pastedFields.add(textarea.id);
             });
         });
-
-        // AI Detection helpers
-        function heuristicAIDetect(text) {
-            const lower = text.toLowerCase();
-            const commonAIPhrases = [
-                'as an ai language model',
-                'as an ai',
-                'as a language model',
-                'i am not able to',
-                'i am unable to',
-                'i do not have access',
-                'i was trained on',
-                'i am a large language model'
-            ];
-            let score = 0;
-            if (commonAIPhrases.some((phrase) => lower.includes(phrase))) {
-                score += 55;
-            }
-            const words = lower.split(/\s+/).filter(Boolean);
-            if (words.length > 50) {
-                const uniqueWords = new Set(words).size;
-                const repetition = 1 - uniqueWords / words.length;
-                score += Math.round(Math.min(30, repetition * 100));
-            }
-            const averageWordLength = words.length ? words.reduce((sum, word) => sum + word.length, 0) / words.length : 0;
-            if (averageWordLength > 6) {
-                score += 10;
-            }
-            return Math.min(100, Math.max(0, score));
-        }
-
-        async function checkAI(text) {
-            const fallback = heuristicAIDetect(text);
-            try {
-                const response = await fetch('https://api.zerogpt.com/v1/detect', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${ZERO_GPT_API_KEY}`
-                    },
-                    body: JSON.stringify({ text })
-                });
-                if (!response.ok) {
-                    const errText = await response.text();
-                    console.warn('AI detection returned error:', response.status, errText);
-                    return { score: fallback, source: 'fallback', error: `HTTP ${response.status}` };
-                }
-                const data = await response.json();
-                const score = typeof data.score === 'number' ? data.score : typeof data.result?.score === 'number' ? data.result.score : null;
-                if (score === null) {
-                    console.warn('AI detection response missing score:', data);
-                    return { score: fallback, source: 'fallback', error: 'missing score' };
-                }
-                return { score: Math.round(score), source: 'remote', error: null };
-            } catch (error) {
-                console.error('AI detection error:', error);
-                return { score: fallback, source: 'fallback', error: error.message || 'network error' };
-            }
-        }
 
         // Form submission
         document.getElementById('applicationForm').addEventListener('submit', async (e) => {
@@ -340,37 +275,15 @@
                 }
             }
 
-            // AI Detection on long answers
-            const longTextareas = [
-                { key: 'Scenario 1', node: document.getElementById('scenario1') },
-                { key: 'Scenario 2', node: document.getElementById('scenario2') },
-                { key: 'Scenario 3', node: document.getElementById('scenario3') },
-                { key: 'Scenario 4', node: document.getElementById('scenario4') },
-                { key: 'Additional Info', node: document.getElementById('additionalInfo') }
-            ];
-            const aiScores = {};
-            const aiSources = [];
-            for (const item of longTextareas) {
-                const textarea = item.node;
-                if (textarea && textarea.value.trim()) {
-                    const detection = await checkAI(textarea.value);
-                    aiScores[item.key] = detection.score;
-                    if (detection.source !== 'remote') {
-                        aiSources.push(`${item.key}: ${detection.error || 'fallback used'}`);
-                    }
-                }
-            }
-
             // Collect form data
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
-            data.aiScores = aiScores;
             data.pasteWarnings = Array.from(pastedFields);
 
             // Send to Discord webhook
             const embed = {
                 title: 'Moderator Application Submission',
-                description: 'A new moderator application has been submitted. Please review the details below.',
+                description: 'A new moderator application has been submitted. Staff review with ✅ to accept or ❌ to deny.',
                 color: 0x1e40af, // Blue to match theme
                 fields: [
                     { name: 'Roblox Username', value: data.robloxUsername, inline: true },
@@ -388,8 +301,7 @@
                     { name: 'AI Agreement', value: data.aiAgreement, inline: true },
                     { name: 'Rush Agreement', value: data.rushAgreement, inline: true },
                     { name: 'Additional Info', value: data.additional || 'None' },
-                    { name: 'AI Detection', value: Object.entries(aiScores).map(([k, v]) => `${k}: ${v}%`).join('\n') || 'None' },
-                    { name: 'AI Detection Mode', value: aiSources.length > 0 ? `Fallback used; ${aiSources.join('; ')}` : 'Remote' },
+                    { name: 'Review Instructions', value: 'Staff can react with ✅ to accept or ❌ to deny.' },
                     { name: 'Paste Warnings', value: data.pasteWarnings.join(', ') || 'None' }
                 ],
                 timestamp: new Date().toISOString(),
@@ -399,26 +311,7 @@
             };
 
             const payload = {
-                embeds: [embed],
-                components: [
-                    {
-                        type: 1,
-                        components: [
-                            {
-                                type: 2,
-                                style: 3,
-                                label: 'Accept',
-                                custom_id: `app_accept`
-                            },
-                            {
-                                type: 2,
-                                style: 4,
-                                label: 'Deny',
-                                custom_id: `app_deny`
-                            }
-                        ]
-                    }
-                ]
+                embeds: [embed]
             };
 
             try {
