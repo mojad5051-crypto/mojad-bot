@@ -130,14 +130,24 @@ class ApplicationReviewView(discord.ui.View):
                             break
 
                 if target_member:
-                    role = guild.get_role(1496970734919094303)
+                    # Use the moderator role ID from config (should be different from staff_role_id)
+                    moderator_role_id = 1496970697430536489  # The role to assign to accepted applicants
+                    role = guild.get_role(moderator_role_id)
                     if role:
                         await target_member.add_roles(role, reason='Moderator application accepted')
-                        logging.info(f"Added role to {target_member}")
-                    await target_member.send('Congratulations! Your moderator application has been accepted for Florida State Roleplay. Welcome to the team!')
-                    logging.info(f"Sent DM to {target_member}")
-            except Exception as e:
-                logging.exception('Failed to process acceptance: %s', e)
+                        logging.info(f"Added moderator role to {target_member}")
+                    else:
+                        logging.error(f"Could not find moderator role with ID {moderator_role_id}")
+                    
+                    try:
+                        await target_member.send('Congratulations! Your moderator application has been accepted for Florida State Roleplay. Welcome to the team!')
+                        logging.info(f"Sent acceptance DM to {target_member}")
+                    except discord.Forbidden:
+                        logging.warning(f"Could not send DM to {target_member} - DMs disabled")
+                    except Exception as e:
+                        logging.exception(f"Failed to send DM to {target_member}: {e}")
+                else:
+                    logging.warning(f"Could not find target member for Discord username: {discord_username}")
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny')
     async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -209,10 +219,15 @@ class ApplicationReviewView(discord.ui.View):
                             break
 
                 if target_member:
-                    await target_member.send('We are sorry, but your moderator application has been denied. Please reapply in the future.')
-                    logging.info(f"Sent denial DM to {target_member}")
-            except Exception as e:
-                logging.exception('Failed to process denial: %s', e)
+                    try:
+                        await target_member.send('We are sorry, but your moderator application has been denied. Please reapply in the future.')
+                        logging.info(f"Sent denial DM to {target_member}")
+                    except discord.Forbidden:
+                        logging.warning(f"Could not send denial DM to {target_member} - DMs disabled")
+                    except Exception as e:
+                        logging.exception(f"Failed to send denial DM to {target_member}: {e}")
+                else:
+                    logging.warning(f"Could not find target member for Discord username: {discord_username}")
 
 
 class FloridaRPBot(commands.Bot):
