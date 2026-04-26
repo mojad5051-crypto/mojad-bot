@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moderator Application</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        discord: '#7289da',
+                        purple: '#9b59b6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6, #60a5fa);
+            color: #2d3748;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card {
+            background-color: #dbeeff;
+            border: 1px solid #8fb6ff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+        .card input,
+        .card textarea {
+            background-color: #eef6ff;
+            border-color: #8fb6ff;
+            color: #0f172a;
+        }
+        .card input:focus,
+        .card textarea:focus {
+            box-shadow: 0 0 0 4px rgba(56, 165, 105, 0.2);
+        }
+        .fading-green {
+            color: #38a169;
+            font-weight: 600;
+        }
+        .required::after {
+            content: ' *';
+            color: #ef4444;
+        }
+        .warning {
+            color: #ef4444;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+        .success {
+            display: none;
+            background-color: rgba(238, 246, 255, 0.95);
+            border: 1px solid #b6d4ff;
+            color: #0f172a;
+            font-size: 1rem;
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-top: 1rem;
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.12);
+        }
+        .success.show {
+            display: block;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-8 px-4">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="card p-6 mb-8 text-center">
+            <h1 class="text-4xl font-bold fading-green mb-2">Moderator Application</h1>
+            <h2 class="text-xl fading-green mb-4">[Florida State Roleplay] Staff Team</h2>
+            <p class="text-gray-700 leading-relaxed">
+                Thank you for your interest in joining our moderator team. Please answer all questions honestly and in your own words. AI-generated or copy-pasted answers will be automatically flagged and may result in denial or blacklist.
+            </p>
+        </div>
+
+        <!-- Form -->
+        <form id="applicationForm" autocomplete="off" class="space-y-6">
+            <!-- Personal Information -->
+            <div id="personal" class="card p-6">
+                <h3 class="text-2xl font-semibold fading-green mb-4">Personal Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="robloxUsername" class="block text-sm font-medium required">Roblox Username</label>
+                        <input type="text" id="robloxUsername" name="robloxUsername" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                    </div>
+                    <div>
+                        <label for="discordUsername" class="block text-sm font-medium required">Discord Username or ID</label>
+                        <input type="text" id="discordUsername" name="discordUsername" placeholder="Username#1234 or numeric ID" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                        <p class="text-xs text-gray-500 mt-1">Provide your full Discord tag or numeric ID so staff can send a direct message.</p>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label for="age" class="block text-sm font-medium required">Your Age</label>
+                    <input type="number" id="age" name="age" min="13" required class="mt-1 block w-full md:w-1/2 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                </div>
+                <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-4">Next</button>
+            </div>
+
+            <!-- Knowledge Check -->
+            <div id="knowledge" class="card p-6" style="display: none;">
+                <h3 class="text-2xl font-semibold fading-green mb-4">Knowledge Check</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="rdm" class="block text-sm font-medium required">What does RDM stand for?</label>
+                        <input type="text" id="rdm" name="rdm" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                    </div>
+                    <div>
+                        <label for="vdm" class="block text-sm font-medium required">What does VDM stand for?</label>
+                        <input type="text" id="vdm" name="vdm" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                    </div>
+                    <div>
+                        <label for="nlr" class="block text-sm font-medium required">What does NLR stand for?</label>
+                        <input type="text" id="nlr" name="nlr" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                    </div>
+                    <div>
+                        <label for="nitrp" class="block text-sm font-medium required">What is NITRP?</label>
+                        <input type="text" id="nitrp" name="nitrp" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="aama" class="block text-sm font-medium required">What is AA/MA?</label>
+                        <input type="text" id="aama" name="aama" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
+            </div>
+
+            <!-- Scenario Questions -->
+            <div id="scenario" class="card p-6" style="display: none;">
+                <h3 class="text-2xl font-semibold fading-green mb-4">Scenario Questions</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label for="scenario1" class="block text-sm font-medium required">Little G shoots a car for fun. What is the appropriate punishment?</label>
+                        <textarea id="scenario1" name="scenario1" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
+                        <div id="warning1" class="warning hidden"></div>
+                    </div>
+                    <div>
+                        <label for="scenario2" class="block text-sm font-medium required">Little B shoots a guy and kills him for fun. What is his punishment?</label>
+                        <textarea id="scenario2" name="scenario2" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
+                        <div id="warning2" class="warning hidden"></div>
+                    </div>
+                    <div>
+                        <label for="scenario3" class="block text-sm font-medium required">If you see a moderator abusing their power, what will you do?</label>
+                        <textarea id="scenario3" name="scenario3" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
+                        <div id="warning3" class="warning hidden"></div>
+                    </div>
+                    <div>
+                        <label for="scenario4" class="block text-sm font-medium required">If you see a player breaking Roblox ToS, what do you do?</label>
+                        <textarea id="scenario4" name="scenario4" rows="4" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
+                        <div id="warning4" class="warning hidden"></div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
+            </div>
+
+            <!-- Agreement -->
+            <div id="agreement" class="card p-6" style="display: none;">
+                <h3 class="text-2xl font-semibold fading-green mb-4">Agreement</h3>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-sm font-medium required">Do you understand that the usage of AI (such as ChatGPT) on this application will result in an immediate staff blacklist?</p>
+                        <div class="mt-2 space-x-4">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="aiAgreement" value="yes" required class="text-green-600 focus:ring-green-500">
+                                <span class="ml-2">Yes</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="aiAgreement" value="no" required class="text-green-600 focus:ring-green-500">
+                                <span class="ml-2">No</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium required">Do you understand that if you ask for your application to be reviewed or rushed, it will result in an automatic denial?</p>
+                        <div class="mt-2 space-x-4">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="rushAgreement" value="yes" required class="text-green-600 focus:ring-green-500">
+                                <span class="ml-2">Yes</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="rushAgreement" value="no" required class="text-green-600 focus:ring-green-500">
+                                <span class="ml-2">No</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div id="additional" class="card p-6" style="display: none;">
+                <h3 class="text-2xl font-semibold fading-green mb-4">Additional Information</h3>
+                <div>
+                    <label for="additionalInfo" class="block text-sm font-medium">Is there anything else you want to let us know? (If not, leave blank.)</label>
+                    <textarea id="additionalInfo" name="additional" rows="4" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 resize-vertical text-gray-900"></textarea>
+                    <div id="warningAdditional" class="warning hidden"></div>
+                </div>
+                <div class="flex items-center gap-3 mt-4">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="button" onclick="nextPage()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Next</button>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div id="submit" class="card p-6 text-center" style="display: none;">
+                <div class="flex items-center justify-center gap-3">
+                    <button type="button" onclick="prevPage()" class="bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 font-bold py-2 px-4 rounded">Back</button>
+                    <button type="submit" id="submitBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-200">Submit Application</button>
+                </div>
+            </div>
+        </form>
+
+        <div id="successMessage" class="success hidden"></div>
+    </div>
+
+    <script>
+        // Constants - Replace with your actual deployed bot URL
+        const API_URL = 'https://mojad-bot.railway.app/apply'; // Updated to your deployed bot URL
+
+        // Autopaste detection
+        const textareas = document.querySelectorAll('textarea');
+        const pastedFields = new Set();
+        textareas.forEach((textarea) => {
+            textarea.addEventListener('paste', () => {
+                pastedFields.add(textarea.id);
+            });
+        });
+
+        // Form submission
+        document.getElementById('applicationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Disable button and show submitting
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            // Basic validation
+            const age = parseInt(document.getElementById('age').value);
+            if (age < 13) {
+                alert('You must be at least 13 years old.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
+                return;
+            }
+
+            const requiredFields = document.querySelectorAll('input[required], textarea[required]');
+            for (let field of requiredFields) {
+                if (!field.value.trim()) {
+                    alert('Please fill in all required fields.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Application';
+                    return;
+                }
+            }
+
+            // Collect form data
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.pasteWarnings = Array.from(pastedFields);
+
+            // Send to bot endpoint for Discord embed creation
+            const embed = {
+                title: 'Moderator Application Submission',
+                description: 'A new moderator application has been submitted. Staff review with ✅ to accept or ❌ to deny.',
+                color: 0x1e40af, // Blue to match theme
+                fields: [
+                    { name: 'Roblox Username', value: data.robloxUsername, inline: true },
+                    { name: 'Discord Username', value: data.discordUsername, inline: true },
+                    { name: 'Age', value: data.age, inline: true },
+                    { name: 'RDM', value: data.rdm, inline: true },
+                    { name: 'VDM', value: data.vdm, inline: true },
+                    { name: 'NLR', value: data.nlr, inline: true },
+                    { name: 'NITRP', value: data.nitrp, inline: true },
+                    { name: 'AA/MA', value: data.aama, inline: true },
+                    { name: 'Scenario 1', value: data.scenario1 },
+                    { name: 'Scenario 2', value: data.scenario2 },
+                    { name: 'Scenario 3', value: data.scenario3 },
+                    { name: 'Scenario 4', value: data.scenario4 },
+                    { name: 'AI Agreement', value: data.aiAgreement, inline: true },
+                    { name: 'Rush Agreement', value: data.rushAgreement, inline: true },
+                    { name: 'Additional Info', value: data.additional || 'None' },
+                    { name: 'Review Instructions', value: 'Staff can react with ✅ to accept or ❌ to deny.' },
+                    { name: 'Paste Warnings', value: data.pasteWarnings.join(', ') || 'None' }
+                ],
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'Florida State Roleplay • Application System'
+                }
+            };
+
+            const payload = {
+                robloxUsername: data.robloxUsername,
+                discordUsername: data.discordUsername,
+                age: data.age,
+                rdm: data.rdm,
+                vdm: data.vdm,
+                nlr: data.nlr,
+                nitrp: data.nitrp,
+                aama: data.aama,
+                scenario1: data.scenario1,
+                scenario2: data.scenario2,
+                scenario3: data.scenario3,
+                scenario4: data.scenario4,
+                aiAgreement: data.aiAgreement,
+                rushAgreement: data.rushAgreement,
+                additional: data.additional,
+                pasteWarnings: Array.from(pastedFields)
+            };
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    document.getElementById('successMessage').textContent = `Submission failed: ${response.status} - ${errorText}`;
+                    document.getElementById('successMessage').classList.add('show');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Application';
+                    return;
+                }
+                document.getElementById('successMessage').textContent = 'Your application has been submitted successfully! Thank you for applying — our staff team will review it and contact you soon.';
+                document.getElementById('successMessage').classList.add('show');
+                document.getElementById('applicationForm').style.display = 'none';
+            } catch (error) {
+                console.error('Submission error:', error);
+                document.getElementById('successMessage').textContent = 'Submission failed. Please try again later.';
+                document.getElementById('successMessage').classList.add('show');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
+            }
+        });
+    </script>
+    <script>
+        let currentPage = 0;
+        const pages = ['personal', 'knowledge', 'scenario', 'agreement', 'additional', 'submit'];
+        function showPage(index) {
+            pages.forEach((id, i) => {
+                document.getElementById(id).style.display = i === index ? 'block' : 'none';
+            });
+        }
+        function nextPage() {
+            if (currentPage < pages.length - 1) {
+                currentPage++;
+                showPage(currentPage);
+            }
+        }
+        function prevPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        }
+    </script>
+</body>
+</html></content>
+<parameter name="filePath">c:\Users\rmd60\discord-bot\apply.html

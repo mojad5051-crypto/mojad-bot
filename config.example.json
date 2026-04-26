@@ -1,0 +1,11 @@
+{
+  "token": "YOUR_BOT_TOKEN_HERE",
+  "guild_id": 1439637360697544808,
+  "review_channel_id": 1497339271047282850,
+  "infraction_log_channel_id": 1496970964322357393,
+  "promotion_log_channel_id": 1496970962904813690,
+  "staff_role_id": 1496970697430536489,
+  "embed_color": 1973790,
+  "panel_banner_url": "https://imgur.com/WxeW12e",
+  "logo_url": "https://imgur.com/WxeW12e"
+}
