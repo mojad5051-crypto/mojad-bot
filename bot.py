@@ -86,6 +86,8 @@ class FloridaRPBot(commands.Bot):
         try:
             channel = self.get_channel(payload.channel_id)
             if channel is None:
+                channel = await self.fetch_channel(payload.channel_id)
+            if channel is None:
                 return
             embed = discord.Embed.from_dict(embeds[0])
             view = discord.ui.View(timeout=None)
