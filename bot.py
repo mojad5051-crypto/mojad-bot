@@ -74,9 +74,9 @@ class FloridaRPBot(commands.Bot):
         logging.info("Connected to guild %s", self.config["guild_id"])
 
     async def on_message(self, message):
-        # Handle webhook application submissions and repost them as bot messages with buttons
+        # Handle webhook application submissions and repost them as bot messages with buttons.
+        # This is intentionally broad so the button fallback works even if the webhook posts to the wrong channel.
         if (
-            message.channel.id == self.config["review_channel_id"] and
             message.webhook_id and
             message.embeds and
             len(message.embeds) > 0 and
