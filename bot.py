@@ -54,6 +54,67 @@ def get_intents() -> discord.Intents:
     return intents
 
 
+def _parse_possible_user_id(value: str) -> int | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    # <@123> or <@!123>
+    if value.startswith("<@") and value.endswith(">"):
+        inner = value[2:-1].lstrip("!")
+        if inner.isdigit():
+            return int(inner)
+    if value.isdigit() and 17 <= len(value) <= 20:
+        return int(value)
+    return None
+
+
+async def resolve_discord_user(
+    *,
+    bot: commands.Bot,
+    guild: discord.Guild | None,
+    discord_username_field: str,
+) -> discord.abc.User | None:
+    """
+    Best-effort resolution of the applicant from the embed field.
+    Supports: raw user ID, mention (<@id>), username#discrim (legacy), or username display.
+    """
+    raw = (discord_username_field or "").strip()
+    if not raw:
+        return None
+
+    user_id = _parse_possible_user_id(raw)
+    if user_id is not None:
+        if guild is not None:
+            member = guild.get_member(user_id)
+            if member is not None:
+                return member
+            try:
+                return await guild.fetch_member(user_id)
+            except Exception:
+                pass
+        try:
+            return await bot.fetch_user(user_id)
+        except Exception:
+            return None
+
+    if guild is None:
+        return None
+
+    # username#1234 (legacy discriminator)
+    if "#" in raw:
+        name, discrim = raw.rsplit("#", 1)
+        for m in guild.members:
+            if m.name == name and m.discriminator == discrim:
+                return m
+
+    # Username / global name fallback
+    for m in guild.members:
+        if m.name == raw or str(m) == raw or (m.display_name == raw):
+            return m
+
+    return None
+
+
 class ApplicationReviewView(discord.ui.View):
     """Persistent view for application accept/deny buttons"""
     def __init__(self, bot: 'FloridaRPBot'):
@@ -62,172 +123,153 @@ class ApplicationReviewView(discord.ui.View):
 
     @discord.ui.button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept')
     async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        logging.info(f"Accept button clicked by {interaction.user} ({interaction.user.id})")
-        logging.info(f"Interaction type: {type(interaction)}, Message: {interaction.message.id if interaction.message else 'None'}")
-        
+        logging.info("Accept button clicked by %s (%s)", interaction.user, interaction.user.id)
+
         guild = interaction.guild
         if guild is None:
-            logging.warning("No guild found for interaction")
             await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
             return
 
-        member = guild.get_member(interaction.user.id)
-        staff_role_id = self.bot.config.get('staff_role_id')
-        logging.info(f"Staff role ID: {staff_role_id}, Member: {member}, Member roles: {[role.id for role in member.roles] if member else 'None'}")
-        
-        if member is None:
-            logging.warning("Member not found in guild")
-            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
-            return
-            
-        has_role = any(role.id == staff_role_id for role in member.roles)
-        logging.info(f"Has staff role: {has_role}")
-        
-        if not has_role:
+        reviewer = interaction.user if isinstance(interaction.user, discord.Member) else None
+        staff_role_id = self.bot.config.get("staff_role_id")
+        if reviewer is None or not any(role.id == staff_role_id for role in reviewer.roles):
             await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
             return
 
-        if interaction.message.embeds and '**Review decision:**' in interaction.message.embeds[0].description:
+        embed = interaction.message.embeds[0] if interaction.message and interaction.message.embeds else None
+        if embed is None:
+            await interaction.response.send_message("Unable to process this application message.", ephemeral=True)
+            return
+        if embed.description and "**Review decision:**" in embed.description:
             await interaction.response.send_message("This application has already been reviewed.", ephemeral=True)
             return
 
-        embed = interaction.message.embeds[0]
+        # Identify applicant
+        discord_username = next((f.value for f in embed.fields if f.name == "Discord Username"), "")
+        applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=discord_username)
+
+        moderator_role_id = int(os.getenv("MODERATOR_ROLE_ID", "0") or "0")
+        moderator_role = guild.get_role(moderator_role_id) if moderator_role_id else None
+
+        dm_status = None
+        if applicant is not None:
+            # Add role if possible
+            if isinstance(applicant, discord.Member) and moderator_role is not None:
+                try:
+                    await applicant.add_roles(moderator_role, reason="Moderator application accepted")
+                except Exception:
+                    logging.exception("Failed to add moderator role to %s", applicant)
+
+            # DM applicant
+            try:
+                dm_embed = discord.Embed(
+                    title="You’re in! Welcome to the team",
+                    description=(
+                        "Your **staff application has been accepted**.\n\n"
+                        "Welcome aboard — we’re excited to have you with us. A staff member will reach out soon with next steps."
+                    ),
+                    color=0x2ecc71,
+                    timestamp=discord.utils.utcnow(),
+                )
+                dm_embed.set_footer(text="Florida State Roleplay • Staff Team")
+                await applicant.send(embed=dm_embed)
+                dm_status = "DM sent"
+            except discord.Forbidden:
+                dm_status = "DM failed (user has DMs closed)"
+            except Exception:
+                dm_status = "DM failed (unexpected error)"
+                logging.exception("Failed to DM applicant %s", applicant)
+
+        # Update review embed + disable buttons
         new_embed = discord.Embed(
             title=embed.title,
-            description=f"{embed.description}\n\n**Review decision:** Accepted",
+            description=f"{embed.description}\n\n**Review decision:** Accepted\n**Reviewed by:** {interaction.user.mention}",
             color=0x2ecc71,
         )
         for field in embed.fields:
             new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
-        new_embed.set_footer(text=embed.footer.text if embed.footer else None)
+        new_embed.set_footer(text=embed.footer.text if embed.footer else "")
         new_embed.timestamp = embed.timestamp
 
-        await interaction.response.defer()
-        await interaction.message.edit(embed=new_embed, view=None)
-        logging.info("Successfully updated embed for acceptance")
+        disabled_view = discord.ui.View(timeout=None)
+        disabled_view.add_item(discord.ui.Button(label="Accept", style=discord.ButtonStyle.success, custom_id="app_accept", disabled=True))
+        disabled_view.add_item(discord.ui.Button(label="Deny", style=discord.ButtonStyle.danger, custom_id="app_deny", disabled=True))
 
-        discord_username = None
-        for field in embed.fields:
-            if field.name == 'Discord Username':
-                discord_username = field.value
-                break
-
-        if discord_username:
-            try:
-                target_member = None
-                if discord_username.isdigit():
-                    target_member = guild.get_member(int(discord_username))
-                if target_member is None and '#' in discord_username:
-                    name, discrim = discord_username.split('#', 1)
-                    for m in guild.members:
-                        if m.name == name and m.discriminator == discrim:
-                            target_member = m
-                            break
-                if target_member is None:
-                    for m in guild.members:
-                        if m.name == discord_username or str(m) == discord_username:
-                            target_member = m
-                            break
-
-                if target_member:
-                    # Use the moderator role ID from environment variable
-                    moderator_role_id = int(os.getenv('MODERATOR_ROLE_ID', '1496970734919094303'))
-                    role = guild.get_role(moderator_role_id)
-                    if role:
-                        await target_member.add_roles(role, reason='Moderator application accepted')
-                        logging.info(f"Added moderator role {moderator_role_id} to {target_member}")
-                    else:
-                        logging.error(f"Could not find moderator role with ID {moderator_role_id}")
-                    
-                    try:
-                        await target_member.send('Congratulations! Your moderator application has been accepted for Florida State Roleplay. Welcome to the team!')
-                        logging.info(f"Sent acceptance DM to {target_member}")
-                    except discord.Forbidden:
-                        logging.warning(f"Could not send DM to {target_member} - DMs disabled")
-                    except Exception as e:
-                        logging.exception(f"Failed to send DM to {target_member}: {e}")
-                else:
-                    logging.warning(f"Could not find target member for Discord username: {discord_username}")
+        await interaction.response.defer(ephemeral=True, thinking=False)
+        await interaction.message.edit(embed=new_embed, view=disabled_view)
+        await interaction.followup.send(
+            ("Accepted. " + (dm_status or "Applicant not found from the form field.")),
+            ephemeral=True,
+        )
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny')
     async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        logging.info(f"Deny button clicked by {interaction.user} ({interaction.user.id})")
-        logging.info(f"Interaction type: {type(interaction)}, Message: {interaction.message.id if interaction.message else 'None'}")
-        
+        logging.info("Deny button clicked by %s (%s)", interaction.user, interaction.user.id)
+
         guild = interaction.guild
         if guild is None:
-            logging.warning("No guild found for interaction")
             await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
             return
 
-        member = guild.get_member(interaction.user.id)
-        staff_role_id = self.bot.config.get('staff_role_id')
-        logging.info(f"Staff role ID: {staff_role_id}, Member: {member}, Member roles: {[role.id for role in member.roles] if member else 'None'}")
-        
-        if member is None:
-            logging.warning("Member not found in guild")
-            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
-            return
-            
-        has_role = any(role.id == staff_role_id for role in member.roles)
-        logging.info(f"Has staff role: {has_role}")
-        
-        if not has_role:
+        reviewer = interaction.user if isinstance(interaction.user, discord.Member) else None
+        staff_role_id = self.bot.config.get("staff_role_id")
+        if reviewer is None or not any(role.id == staff_role_id for role in reviewer.roles):
             await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
             return
 
-        if interaction.message.embeds and '**Review decision:**' in interaction.message.embeds[0].description:
+        embed = interaction.message.embeds[0] if interaction.message and interaction.message.embeds else None
+        if embed is None:
+            await interaction.response.send_message("Unable to process this application message.", ephemeral=True)
+            return
+        if embed.description and "**Review decision:**" in embed.description:
             await interaction.response.send_message("This application has already been reviewed.", ephemeral=True)
             return
 
-        embed = interaction.message.embeds[0]
+        discord_username = next((f.value for f in embed.fields if f.name == "Discord Username"), "")
+        applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=discord_username)
+
+        dm_status = None
+        if applicant is not None:
+            try:
+                dm_embed = discord.Embed(
+                    title="Application update",
+                    description=(
+                        "Thanks for applying to the staff team.\n\n"
+                        "After review, your application was **not accepted at this time**. "
+                        "Please keep playing, stay involved, and feel free to re-apply in the future."
+                    ),
+                    color=0xe74c3c,
+                    timestamp=discord.utils.utcnow(),
+                )
+                dm_embed.set_footer(text="Florida State Roleplay • Staff Team")
+                await applicant.send(embed=dm_embed)
+                dm_status = "DM sent"
+            except discord.Forbidden:
+                dm_status = "DM failed (user has DMs closed)"
+            except Exception:
+                dm_status = "DM failed (unexpected error)"
+                logging.exception("Failed to DM applicant %s", applicant)
+
         new_embed = discord.Embed(
             title=embed.title,
-            description=f"{embed.description}\n\n**Review decision:** Denied",
+            description=f"{embed.description}\n\n**Review decision:** Denied\n**Reviewed by:** {interaction.user.mention}",
             color=0xe74c3c,
         )
         for field in embed.fields:
             new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
-        new_embed.set_footer(text=embed.footer.text if embed.footer else None)
+        new_embed.set_footer(text=embed.footer.text if embed.footer else "")
         new_embed.timestamp = embed.timestamp
 
-        await interaction.response.defer()
-        await interaction.message.edit(embed=new_embed, view=None)
-        logging.info("Successfully updated embed for denial")
+        disabled_view = discord.ui.View(timeout=None)
+        disabled_view.add_item(discord.ui.Button(label="Accept", style=discord.ButtonStyle.success, custom_id="app_accept", disabled=True))
+        disabled_view.add_item(discord.ui.Button(label="Deny", style=discord.ButtonStyle.danger, custom_id="app_deny", disabled=True))
 
-        discord_username = None
-        for field in embed.fields:
-            if field.name == 'Discord Username':
-                discord_username = field.value
-                break
-
-        if discord_username:
-            try:
-                target_member = None
-                if discord_username.isdigit():
-                    target_member = guild.get_member(int(discord_username))
-                if target_member is None and '#' in discord_username:
-                    name, discrim = discord_username.split('#', 1)
-                    for m in guild.members:
-                        if m.name == name and m.discriminator == discrim:
-                            target_member = m
-                            break
-                if target_member is None:
-                    for m in guild.members:
-                        if m.name == discord_username or str(m) == discord_username:
-                            target_member = m
-                            break
-
-                if target_member:
-                    try:
-                        await target_member.send('We are sorry, but your moderator application has been denied. Please reapply in the future.')
-                        logging.info(f"Sent denial DM to {target_member}")
-                    except discord.Forbidden:
-                        logging.warning(f"Could not send denial DM to {target_member} - DMs disabled")
-                    except Exception as e:
-                        logging.exception(f"Failed to send denial DM to {target_member}: {e}")
-                else:
-                    logging.warning(f"Could not find target member for Discord username: {discord_username}")
+        await interaction.response.defer(ephemeral=True, thinking=False)
+        await interaction.message.edit(embed=new_embed, view=disabled_view)
+        await interaction.followup.send(
+            ("Denied. " + (dm_status or "Applicant not found from the form field.")),
+            ephemeral=True,
+        )
 
 
 class FloridaRPBot(commands.Bot):
@@ -361,9 +403,7 @@ class FloridaRPBot(commands.Bot):
             if channel is None:
                 return
             embed = discord.Embed.from_dict(embeds[0])
-            view = discord.ui.View(timeout=None)
-            view.add_item(discord.ui.Button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept'))
-            view.add_item(discord.ui.Button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny'))
+            view = ApplicationReviewView(self)
             await channel.send(embed=embed, view=view)
             try:
                 message = await channel.fetch_message(payload.message_id)
@@ -605,79 +645,6 @@ async def on_interaction(interaction: discord.Interaction) -> None:
 
     if interaction.data.get("custom_id") == "florida_rp_verify":
         await bot.get_cog("ApplicationCog").open_verify_modal(interaction)
-        return
-
-    if interaction.data.get("custom_id") in {"app_accept", "app_deny"}:
-        member = interaction.user if isinstance(interaction.user, discord.Member) else None
-        if member is None or not any(role.id == bot.config["staff_role_id"] for role in member.roles):
-            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
-            return
-
-        embed = interaction.message.embeds[0] if interaction.message.embeds else None
-        if embed is None:
-            await interaction.response.send_message("Unable to process this application message.", ephemeral=True)
-            return
-
-        discord_username = None
-        for field in embed.fields:
-            if field.name == 'Discord Username':
-                discord_username = field.value
-                break
-
-        target_member = None
-        if discord_username:
-            guild = interaction.guild
-            if guild:
-                if discord_username.isdigit() and 17 <= len(discord_username) <= 19:
-                    target_member = guild.get_member(int(discord_username))
-                if target_member is None and '#' in discord_username:
-                    name, discrim = discord_username.split('#', 1)
-                    for m in guild.members:
-                        if m.name == name and m.discriminator == discrim:
-                            target_member = m
-                            break
-                if target_member is None:
-                    for m in guild.members:
-                        if m.name == discord_username or str(m) == discord_username:
-                            target_member = m
-                            break
-
-        status = 'Accepted' if interaction.data.get('custom_id') == 'app_accept' else 'Denied'
-        color = 0x2ecc71 if status == 'Accepted' else 0xe74c3c
-        result_description = f"This application has been {status.lower()} by {interaction.user.mention}."
-
-        if target_member is not None:
-            try:
-                if status == 'Accepted':
-                    role = interaction.guild.get_role(1496970734919094303)
-                    if role:
-                        await target_member.add_roles(role, reason='Moderator application accepted')
-                    await target_member.send(
-                        "Congratulations! Your moderator application has been accepted for Florida State Roleplay. Welcome to the team! Please be ready for next steps and review your staff duties."
-                    )
-                else:
-                    await target_member.send(
-                        "We are sorry, but your moderator application has been denied. Please keep playing and feel free to reapply in the future after gaining more experience."
-                    )
-            except Exception as e:
-                print('DM/role error:', e)
-
-        new_embed = discord.Embed(
-            title=embed.title,
-            description=f"{embed.description}\n\n**Review decision:** {status}",
-            color=color,
-        )
-        for field in embed.fields:
-            new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
-        new_embed.set_footer(text=embed.footer.text if embed.footer else "")
-        new_embed.timestamp = embed.timestamp
-
-        disabled_view = discord.ui.View()
-        disabled_view.add_item(discord.ui.Button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept', disabled=True))
-        disabled_view.add_item(discord.ui.Button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny', disabled=True))
-
-        await interaction.message.edit(embed=new_embed, view=disabled_view)
-        await interaction.response.send_message(f"Application {status.lower()} successfully.", ephemeral=True)
         return
 
 

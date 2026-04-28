@@ -42,6 +42,7 @@ python bot.py
    - `INFRACTION_LOG_CHANNEL_ID`: Channel ID for infraction logs
    - `PROMOTION_LOG_CHANNEL_ID`: Channel ID for promotion logs
    - `STAFF_ROLE_ID`: Role ID for staff permissions
+   - `MODERATOR_ROLE_ID`: Role to give applicants on acceptance
    - `EMBED_COLOR`: Hex color code (default: 1973790)
    - `PANEL_BANNER_URL`: URL for panel banner image
    - `LOGO_URL`: URL for logo image
