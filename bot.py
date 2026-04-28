@@ -161,8 +161,10 @@ class ApplicationReviewView(discord.ui.View):
             return
 
         # Identify applicant
+        discord_user_id_value = next((f.value for f in embed.fields if f.name == "Discord User ID"), "")
         discord_username = next((f.value for f in embed.fields if f.name == "Discord Username"), "")
-        applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=discord_username)
+        lookup_value = discord_user_id_value or discord_username
+        applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=lookup_value)
 
         moderator_role_id = int(os.getenv("MODERATOR_ROLE_ID", "0") or "0")
         moderator_role = guild.get_role(moderator_role_id) if moderator_role_id else None
@@ -230,7 +232,7 @@ class ApplicationReviewView(discord.ui.View):
                 f"- Applicant: {applicant.mention if isinstance(applicant, discord.abc.User) else 'Not found'}\n"
                 f"- DM: {dm_status or 'Not attempted'}\n"
                 f"- Role: {role_status or 'Not attempted'}\n"
-                f"- Form field value: `{discord_username}`"
+                f"- Lookup value: `{lookup_value}`"
             ),
             ephemeral=True,
         )
@@ -258,8 +260,10 @@ class ApplicationReviewView(discord.ui.View):
             await interaction.response.send_message("This application has already been reviewed.", ephemeral=True)
             return
 
+        discord_user_id_value = next((f.value for f in embed.fields if f.name == "Discord User ID"), "")
         discord_username = next((f.value for f in embed.fields if f.name == "Discord Username"), "")
-        applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=discord_username)
+        lookup_value = discord_user_id_value or discord_username
+        applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=lookup_value)
 
         dm_status = None
         if applicant is not None:
@@ -305,7 +309,7 @@ class ApplicationReviewView(discord.ui.View):
                 "Denied.\n"
                 f"- Applicant: {applicant.mention if isinstance(applicant, discord.abc.User) else 'Not found'}\n"
                 f"- DM: {dm_status or 'Not attempted'}\n"
-                f"- Form field value: `{discord_username}`"
+                f"- Lookup value: `{lookup_value}`"
             ),
             ephemeral=True,
         )
@@ -349,7 +353,7 @@ class FloridaRPBot(commands.Bot):
 
             required_fields = [
                 "robloxUsername",
-                "discordUsername",
+                "discordUserId",
                 "age",
                 "rdm",
                 "vdm",
@@ -378,7 +382,8 @@ class FloridaRPBot(commands.Bot):
                 timestamp=discord.utils.utcnow()
             )
             embed.add_field(name="Roblox Username", value=data["robloxUsername"], inline=True)
-            embed.add_field(name="Discord Username", value=data["discordUsername"], inline=True)
+            embed.add_field(name="Discord User ID", value=str(data["discordUserId"]), inline=True)
+            embed.add_field(name="Discord Username", value=(data.get("discordUsername") or "Not provided"), inline=True)
             embed.add_field(name="Age", value=data["age"], inline=True)
             embed.add_field(name="RDM", value=data["rdm"], inline=True)
             embed.add_field(name="VDM", value=data["vdm"], inline=True)
