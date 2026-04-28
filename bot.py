@@ -148,6 +148,8 @@ class ApplicationReviewView(discord.ui.View):
                         logging.exception(f"Failed to send DM to {target_member}: {e}")
                 else:
                     logging.warning(f"Could not find target member for Discord username: {discord_username}")
+            except Exception as e:
+                logging.exception(f"Error processing acceptance for Discord username {discord_username}: {e}")
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny')
     async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -228,7 +230,8 @@ class ApplicationReviewView(discord.ui.View):
                         logging.exception(f"Failed to send denial DM to {target_member}: {e}")
                 else:
                     logging.warning(f"Could not find target member for Discord username: {discord_username}")
-
+            except Exception as e:
+                logging.exception(f"Error processing denial for Discord username {discord_username}: {e}")
 
 class FloridaRPBot(commands.Bot):
     def __init__(self, config: dict):
