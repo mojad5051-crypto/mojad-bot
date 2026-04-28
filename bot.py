@@ -687,4 +687,6 @@ async def on_interaction(interaction: discord.Interaction) -> None:
 
 
 if __name__ == "__main__":
+    config = load_config()
+    bot = FloridaRPBot(config)
     bot.run(config["token"])
