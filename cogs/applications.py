@@ -3,8 +3,17 @@ from discord.ext import commands
 
 
 class ApplicationModal(discord.ui.Modal, title="Staff Application"):
-        db = self.bot.db
-        application_id = db.add_application(
+    age = discord.ui.TextInput(label="Age", placeholder="Your age", required=True)
+    experience = discord.ui.TextInput(label="Experience", style=discord.TextStyle.paragraph, placeholder="Your past roleplay or staff experience", required=True)
+    availability = discord.ui.TextInput(label="Availability", placeholder="Days and times you are available", required=True)
+    motivation = discord.ui.TextInput(label="Why should we accept you?", style=discord.TextStyle.paragraph, placeholder="Tell us why you want to join staff", required=True)
+
+    def __init__(self, bot: commands.Bot):
+        super().__init__()
+        self.bot = bot
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        application_id = self.bot.db.add_application(
             user_id=interaction.user.id,
             user_name=str(interaction.user),
             age=self.age.value,
@@ -24,7 +33,7 @@ class ApplicationModal(discord.ui.Modal, title="Staff Application"):
         embed.add_field(name="Motivation", value=self.motivation.value, inline=False)
         embed.set_footer(text=f"Application ID: {application_id}")
 
-        review_channel = interaction.guild.get_channel(self.bot.config["review_channel_id"])
+        review_channel = interaction.guild.get_channel(self.bot.config["review_channel_id"]) if interaction.guild else None
         if review_channel is not None:
             await review_channel.send(embed=embed)
 
@@ -43,8 +52,7 @@ class VerifyRobloxModal(discord.ui.Modal, title="Verify Roblox Username"):
             await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
             return
 
-        db = self.bot.db
-        db.add_roblox_verification(
+        self.bot.db.add_roblox_verification(
             user_id=interaction.user.id,
             roblox_username=self.roblox_username.value,
         )

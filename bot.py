@@ -19,6 +19,12 @@ CONFIG_PATH = BASE_DIR / "config.json"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+}
+
 
 def load_config() -> dict:
     load_dotenv()
@@ -267,7 +273,7 @@ class FloridaRPBot(commands.Bot):
                 logging.info(f"Application data received: {list(data.keys())}")
             except Exception:
                 logging.exception("Failed to parse JSON")
-                return web.json_response({"success": False, "error": "Invalid JSON"}, status=400)
+                return web.json_response({"success": False, "error": "Invalid JSON"}, status=400, headers=CORS_HEADERS)
 
             required_fields = [
                 "robloxUsername",
@@ -287,11 +293,11 @@ class FloridaRPBot(commands.Bot):
             ]
             for field in required_fields:
                 if not data.get(field):
-                    return web.json_response({"success": False, "error": f"Missing field: {field}"}, status=400)
+                    return web.json_response({"success": False, "error": f"Missing field: {field}"}, status=400, headers=CORS_HEADERS)
 
             review_channel = self.get_channel(self.config["review_channel_id"]) or await self.fetch_channel(self.config["review_channel_id"])
             if review_channel is None:
-                return web.json_response({"success": False, "error": "Review channel not found"}, status=500)
+                return web.json_response({"success": False, "error": "Review channel not found"}, status=500, headers=CORS_HEADERS)
 
             embed = discord.Embed(
                 title="Moderator Application Submission",
@@ -325,16 +331,12 @@ class FloridaRPBot(commands.Bot):
                 logging.info(f"Successfully sent application embed with message ID: {message.id}")
             except Exception as exc:
                 logging.exception('Failed to send application embed: %s', exc)
-                return web.json_response({"success": False, "error": "Failed to send application embed"}, status=500)
+                return web.json_response({"success": False, "error": "Failed to send application embed"}, status=500, headers=CORS_HEADERS)
 
-            return web.json_response({"success": True})
+            return web.json_response({"success": True}, headers=CORS_HEADERS)
 
         async def handle_options(request: web.Request) -> web.Response:
-            return web.Response(status=204, headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            })
+            return web.Response(status=204, headers=CORS_HEADERS)
 
         app = web.Application()
         app.router.add_post("/apply", handle_apply)
