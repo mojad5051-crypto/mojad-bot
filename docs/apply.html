@@ -97,10 +97,16 @@
                         <input type="text" id="robloxUsername" name="robloxUsername" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
                     </div>
                     <div>
-                        <label for="discordUsername" class="block text-sm font-medium required">Discord Username or ID</label>
-                        <input type="text" id="discordUsername" name="discordUsername" placeholder="Username#1234 or numeric ID" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
-                        <p class="text-xs text-gray-500 mt-1">Provide your full Discord tag or numeric ID so staff can send a direct message.</p>
+                        <label for="discordUserId" class="block text-sm font-medium required">Discord User ID</label>
+                        <input type="text" id="discordUserId" name="discordUserId" inputmode="numeric" pattern="\\d{17,20}" placeholder="Example: 123456789012345678" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
+                        <p class="text-xs text-gray-500 mt-1">
+                            This is a number. In Discord: <b>User Settings → Advanced → Developer Mode</b>, then right‑click your profile → <b>Copy User ID</b>.
+                        </p>
                     </div>
+                </div>
+                <div class="mt-4">
+                    <label for="discordUsername" class="block text-sm font-medium">Discord Username (optional)</label>
+                    <input type="text" id="discordUsername" name="discordUsername" placeholder="Optional (for display only)" class="mt-1 block w-full md:w-1/2 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-900">
                 </div>
                 <div class="mt-4">
                     <label for="age" class="block text-sm font-medium required">Your Age</label>
@@ -265,6 +271,14 @@
                 return;
             }
 
+            const discordUserId = document.getElementById('discordUserId').value.trim();
+            if (!/^\d{17,20}$/.test(discordUserId)) {
+                alert('Please enter a valid Discord User ID (17-20 digits).');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
+                return;
+            }
+
             const requiredFields = document.querySelectorAll('input[required], textarea[required]');
             for (let field of requiredFields) {
                 if (!field.value.trim()) {
@@ -283,6 +297,7 @@
             // Send to bot endpoint for Discord embed creation
             const payload = {
                 robloxUsername: data.robloxUsername,
+                discordUserId: data.discordUserId,
                 discordUsername: data.discordUsername,
                 age: data.age,
                 rdm: data.rdm,

@@ -112,6 +112,22 @@ async def resolve_discord_user(
         if m.name == raw or str(m) == raw or (m.display_name == raw):
             return m
 
+    # If member cache doesn't include the applicant, fetch members and try again.
+    # (This is slower, but only runs on accept/deny clicks.)
+    raw_lower = raw.lower()
+    try:
+        async for m in guild.fetch_members(limit=None):
+            if (
+                m.name == raw
+                or str(m) == raw
+                or m.display_name == raw
+                or m.name.lower() == raw_lower
+                or m.display_name.lower() == raw_lower
+            ):
+                return m
+    except Exception:
+        logging.exception("Failed fetching members for applicant resolution")
+
     return None
 
 
@@ -152,12 +168,21 @@ class ApplicationReviewView(discord.ui.View):
         moderator_role = guild.get_role(moderator_role_id) if moderator_role_id else None
 
         dm_status = None
+        role_status = None
         if applicant is not None:
             # Add role if possible
-            if isinstance(applicant, discord.Member) and moderator_role is not None:
+            if moderator_role is None:
+                role_status = "Role not configured (MODERATOR_ROLE_ID missing/invalid)"
+            elif not isinstance(applicant, discord.Member):
+                role_status = "Role not added (applicant is not in this server)"
+            else:
                 try:
                     await applicant.add_roles(moderator_role, reason="Moderator application accepted")
+                    role_status = f"Role added: {moderator_role.name}"
+                except discord.Forbidden:
+                    role_status = "Role add failed (bot missing Manage Roles or role hierarchy)"
                 except Exception:
+                    role_status = "Role add failed (unexpected error)"
                     logging.exception("Failed to add moderator role to %s", applicant)
 
             # DM applicant
@@ -179,6 +204,8 @@ class ApplicationReviewView(discord.ui.View):
             except Exception:
                 dm_status = "DM failed (unexpected error)"
                 logging.exception("Failed to DM applicant %s", applicant)
+        else:
+            role_status = None
 
         # Update review embed + disable buttons
         new_embed = discord.Embed(
@@ -198,7 +225,13 @@ class ApplicationReviewView(discord.ui.View):
         await interaction.response.defer(ephemeral=True, thinking=False)
         await interaction.message.edit(embed=new_embed, view=disabled_view)
         await interaction.followup.send(
-            ("Accepted. " + (dm_status or "Applicant not found from the form field.")),
+            (
+                "Accepted.\n"
+                f"- Applicant: {applicant.mention if isinstance(applicant, discord.abc.User) else 'Not found'}\n"
+                f"- DM: {dm_status or 'Not attempted'}\n"
+                f"- Role: {role_status or 'Not attempted'}\n"
+                f"- Form field value: `{discord_username}`"
+            ),
             ephemeral=True,
         )
 
@@ -250,6 +283,7 @@ class ApplicationReviewView(discord.ui.View):
                 dm_status = "DM failed (unexpected error)"
                 logging.exception("Failed to DM applicant %s", applicant)
 
+        # Update review embed + disable buttons
         new_embed = discord.Embed(
             title=embed.title,
             description=f"{embed.description}\n\n**Review decision:** Denied\n**Reviewed by:** {interaction.user.mention}",
@@ -267,7 +301,12 @@ class ApplicationReviewView(discord.ui.View):
         await interaction.response.defer(ephemeral=True, thinking=False)
         await interaction.message.edit(embed=new_embed, view=disabled_view)
         await interaction.followup.send(
-            ("Denied. " + (dm_status or "Applicant not found from the form field.")),
+            (
+                "Denied.\n"
+                f"- Applicant: {applicant.mention if isinstance(applicant, discord.abc.User) else 'Not found'}\n"
+                f"- DM: {dm_status or 'Not attempted'}\n"
+                f"- Form field value: `{discord_username}`"
+            ),
             ephemeral=True,
         )
 
