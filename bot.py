@@ -31,6 +31,7 @@ def load_config() -> dict:
     
     config["guild_id"] = int(os.getenv("GUILD_ID", "0"))
     config["review_channel_id"] = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
+    config["log_channel_id"] = int(os.getenv("LOG_CHANNEL_ID", "0"))
     config["infraction_log_channel_id"] = int(os.getenv("INFRACTION_LOG_CHANNEL_ID", "0"))
     config["promotion_log_channel_id"] = int(os.getenv("PROMOTION_LOG_CHANNEL_ID", "0"))
     config["staff_role_id"] = int(os.getenv("STAFF_ROLE_ID", "0"))
@@ -131,16 +132,49 @@ async def resolve_discord_user(
     return None
 
 
+class ReviewReasonModal(discord.ui.Modal, title="Application Review Reason"):
+    reason = discord.ui.TextInput(
+        label="Reason for this decision",
+        style=discord.TextStyle.long,
+        required=False,
+        placeholder="Enter a note that will be sent to the applicant in the DM.",
+        max_length=1024,
+    )
+
+    def __init__(self, *, view: 'ApplicationReviewView', original_interaction: discord.Interaction, accepted: bool):
+        super().__init__()
+        self.view = view
+        self.original_interaction = original_interaction
+        self.message = original_interaction.message
+        self.accepted = accepted
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await self.view.process_review(
+            interaction=interaction,
+            message=self.message,
+            accepted=self.accepted,
+            reason=self.reason.value.strip(),
+        )
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        logging.exception("ReviewReasonModal submit failed: %s", error)
+        await interaction.response.send_message("Sorry, something went wrong while submitting the review reason.", ephemeral=True)
+
+
 class ApplicationReviewView(discord.ui.View):
     """Persistent view for application accept/deny buttons"""
     def __init__(self, bot: 'FloridaRPBot'):
         super().__init__(timeout=None)
         self.bot = bot
 
-    @discord.ui.button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept')
-    async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        logging.info("Accept button clicked by %s (%s)", interaction.user, interaction.user.id)
-
+    async def process_review(
+        self,
+        *,
+        interaction: discord.Interaction,
+        message: discord.Message | None,
+        accepted: bool,
+        reason: str,
+    ) -> None:
         guild = interaction.guild
         if guild is None:
             await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
@@ -152,27 +186,25 @@ class ApplicationReviewView(discord.ui.View):
             await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
             return
 
-        embed = interaction.message.embeds[0] if interaction.message and interaction.message.embeds else None
-        if embed is None:
+        if message is None or not message.embeds:
             await interaction.response.send_message("Unable to process this application message.", ephemeral=True)
             return
+
+        embed = message.embeds[0]
         if embed.description and "**Review decision:**" in embed.description:
             await interaction.response.send_message("This application has already been reviewed.", ephemeral=True)
             return
 
-        # Identify applicant
         discord_user_id_value = next((f.value for f in embed.fields if f.name == "Discord User ID"), "")
         discord_username = next((f.value for f in embed.fields if f.name == "Discord Username"), "")
         lookup_value = discord_user_id_value or discord_username
         applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=lookup_value)
 
-        moderator_role_id = int(os.getenv("MODERATOR_ROLE_ID", "0") or "0")
-        moderator_role = guild.get_role(moderator_role_id) if moderator_role_id else None
-
         dm_status = None
         role_status = None
-        if applicant is not None:
-            # Add role if possible
+        if accepted and applicant is not None:
+            moderator_role_id = int(os.getenv("MODERATOR_ROLE_ID", "0") or "0")
+            moderator_role = guild.get_role(moderator_role_id) if moderator_role_id else None
             if moderator_role is None:
                 role_status = "Role not configured (MODERATOR_ROLE_ID missing/invalid)"
             elif not isinstance(applicant, discord.Member):
@@ -187,17 +219,33 @@ class ApplicationReviewView(discord.ui.View):
                     role_status = "Role add failed (unexpected error)"
                     logging.exception("Failed to add moderator role to %s", applicant)
 
-            # DM applicant
+        if applicant is not None:
             try:
-                dm_embed = discord.Embed(
-                    title="You’re in! Welcome to the team",
-                    description=(
-                        "Your **staff application has been accepted**.\n\n"
-                        "Welcome aboard — we’re excited to have you with us. A staff member will reach out soon with next steps."
-                    ),
-                    color=0x2ecc71,
-                    timestamp=discord.utils.utcnow(),
-                )
+                if accepted:
+                    dm_embed = discord.Embed(
+                        title="Application Accepted",
+                        description=(
+                            "Your **staff application has been accepted**.\n\n"
+                            "Congratulations! Please complete your staff training as soon as possible."
+                        ),
+                        color=0x2ecc71,
+                        timestamp=discord.utils.utcnow(),
+                    )
+                    dm_embed.add_field(name="Review Reason", value=reason or "No reason provided.", inline=False)
+                    dm_embed.add_field(name="Next Step", value="You will need to complete training before full staff duties.", inline=False)
+                else:
+                    dm_embed = discord.Embed(
+                        title="Application Denied",
+                        description=(
+                            "Thank you for applying to the staff team.\n\n"
+                            "After review, your application was not accepted at this time."
+                        ),
+                        color=0xe74c3c,
+                        timestamp=discord.utils.utcnow(),
+                    )
+                    dm_embed.add_field(name="Review Reason", value=reason or "No reason provided.", inline=False)
+                    dm_embed.add_field(name="Next Step", value="Please stay involved in the community and feel free to reapply later.", inline=False)
+
                 dm_embed.set_footer(text="Florida State Roleplay • Staff Team")
                 await applicant.send(embed=dm_embed)
                 dm_status = "DM sent"
@@ -206,14 +254,15 @@ class ApplicationReviewView(discord.ui.View):
             except Exception:
                 dm_status = "DM failed (unexpected error)"
                 logging.exception("Failed to DM applicant %s", applicant)
-        else:
-            role_status = None
 
-        # Update review embed + disable buttons
+        new_description = f"{embed.description}\n\n**Review decision:** {'Accepted' if accepted else 'Denied'}\n**Reviewed by:** {interaction.user.mention}"
+        if reason:
+            new_description += f"\n**Review reason:** {reason}"
+
         new_embed = discord.Embed(
             title=embed.title,
-            description=f"{embed.description}\n\n**Review decision:** Accepted\n**Reviewed by:** {interaction.user.mention}",
-            color=0x2ecc71,
+            description=new_description,
+            color=0x2ecc71 if accepted else 0xe74c3c,
         )
         for field in embed.fields:
             new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
@@ -225,94 +274,33 @@ class ApplicationReviewView(discord.ui.View):
         disabled_view.add_item(discord.ui.Button(label="Deny", style=discord.ButtonStyle.danger, custom_id="app_deny", disabled=True))
 
         await interaction.response.defer(ephemeral=True, thinking=False)
-        await interaction.message.edit(embed=new_embed, view=disabled_view)
+        await message.edit(embed=new_embed, view=disabled_view)
         await interaction.followup.send(
             (
-                "Accepted.\n"
+                f"{'Accepted' if accepted else 'Denied'}.\n"
                 f"- Applicant: {applicant.mention if isinstance(applicant, discord.abc.User) else 'Not found'}\n"
                 f"- DM: {dm_status or 'Not attempted'}\n"
-                f"- Role: {role_status or 'Not attempted'}\n"
                 f"- Lookup value: `{lookup_value}`"
             ),
             ephemeral=True,
         )
+
+        # Send to log channel
+        log_channel = self.bot.get_channel(self.bot.config["log_channel_id"]) or await self.bot.fetch_channel(self.bot.config["log_channel_id"])
+        if log_channel is not None:
+            await log_channel.send(f"Application {'accepted' if accepted else 'denied'} for <@{discord_user_id_value}>")
+
+    @discord.ui.button(label='Accept', style=discord.ButtonStyle.success, custom_id='app_accept')
+    async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        logging.info("Accept button clicked by %s (%s)", interaction.user, interaction.user.id)
+
+        await interaction.response.send_modal(ReviewReasonModal(view=self, original_interaction=interaction, accepted=True))
 
     @discord.ui.button(label='Deny', style=discord.ButtonStyle.danger, custom_id='app_deny')
     async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         logging.info("Deny button clicked by %s (%s)", interaction.user, interaction.user.id)
 
-        guild = interaction.guild
-        if guild is None:
-            await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
-            return
-
-        reviewer = interaction.user if isinstance(interaction.user, discord.Member) else None
-        staff_role_id = self.bot.config.get("staff_role_id")
-        if reviewer is None or not any(role.id == staff_role_id for role in reviewer.roles):
-            await interaction.response.send_message("You do not have permission to review applications.", ephemeral=True)
-            return
-
-        embed = interaction.message.embeds[0] if interaction.message and interaction.message.embeds else None
-        if embed is None:
-            await interaction.response.send_message("Unable to process this application message.", ephemeral=True)
-            return
-        if embed.description and "**Review decision:**" in embed.description:
-            await interaction.response.send_message("This application has already been reviewed.", ephemeral=True)
-            return
-
-        discord_user_id_value = next((f.value for f in embed.fields if f.name == "Discord User ID"), "")
-        discord_username = next((f.value for f in embed.fields if f.name == "Discord Username"), "")
-        lookup_value = discord_user_id_value or discord_username
-        applicant = await resolve_discord_user(bot=self.bot, guild=guild, discord_username_field=lookup_value)
-
-        dm_status = None
-        if applicant is not None:
-            try:
-                dm_embed = discord.Embed(
-                    title="Application update",
-                    description=(
-                        "Thanks for applying to the staff team.\n\n"
-                        "After review, your application was **not accepted at this time**. "
-                        "Please keep playing, stay involved, and feel free to re-apply in the future."
-                    ),
-                    color=0xe74c3c,
-                    timestamp=discord.utils.utcnow(),
-                )
-                dm_embed.set_footer(text="Florida State Roleplay • Staff Team")
-                await applicant.send(embed=dm_embed)
-                dm_status = "DM sent"
-            except discord.Forbidden:
-                dm_status = "DM failed (user has DMs closed)"
-            except Exception:
-                dm_status = "DM failed (unexpected error)"
-                logging.exception("Failed to DM applicant %s", applicant)
-
-        # Update review embed + disable buttons
-        new_embed = discord.Embed(
-            title=embed.title,
-            description=f"{embed.description}\n\n**Review decision:** Denied\n**Reviewed by:** {interaction.user.mention}",
-            color=0xe74c3c,
-        )
-        for field in embed.fields:
-            new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
-        new_embed.set_footer(text=embed.footer.text if embed.footer else "")
-        new_embed.timestamp = embed.timestamp
-
-        disabled_view = discord.ui.View(timeout=None)
-        disabled_view.add_item(discord.ui.Button(label="Accept", style=discord.ButtonStyle.success, custom_id="app_accept", disabled=True))
-        disabled_view.add_item(discord.ui.Button(label="Deny", style=discord.ButtonStyle.danger, custom_id="app_deny", disabled=True))
-
-        await interaction.response.defer(ephemeral=True, thinking=False)
-        await interaction.message.edit(embed=new_embed, view=disabled_view)
-        await interaction.followup.send(
-            (
-                "Denied.\n"
-                f"- Applicant: {applicant.mention if isinstance(applicant, discord.abc.User) else 'Not found'}\n"
-                f"- DM: {dm_status or 'Not attempted'}\n"
-                f"- Lookup value: `{lookup_value}`"
-            ),
-            ephemeral=True,
-        )
+        await interaction.response.send_modal(ReviewReasonModal(view=self, original_interaction=interaction, accepted=False))
 
 
 class FloridaRPBot(commands.Bot):
