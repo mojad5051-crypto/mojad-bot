@@ -277,7 +277,8 @@ class FloridaRPBot(commands.Bot):
 
     async def start_web_server(self) -> None:
         async def handle_health(request: web.Request) -> web.Response:
-            return web.Response(text="OK", status=200)
+            logging.info("Health check request received: %s %s", request.method, request.path)
+            return web.Response(text="OK", status=200, headers=CORS_HEADERS)
 
         async def handle_apply(request: web.Request) -> web.Response:
             logging.info("Received application submission request")
@@ -352,8 +353,8 @@ class FloridaRPBot(commands.Bot):
             return web.Response(status=204, headers=CORS_HEADERS)
 
         app = web.Application()
-        app.router.add_get("/", handle_health)
-        app.router.add_get("/health", handle_health)
+        app.router.add_route("*", "/", handle_health)
+        app.router.add_route("*", "/health", handle_health)
         app.router.add_post("/apply", handle_apply)
         app.router.add_options("/apply", handle_options)
         runner = web.AppRunner(app)
