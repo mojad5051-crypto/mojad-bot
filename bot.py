@@ -256,6 +256,7 @@ class FloridaRPBot(commands.Bot):
         self.db = Database(BASE_DIR / "data" / "storage.sqlite")
         self.afk_users = {}
         self.tree.on_error = self.on_app_command_error
+        self.web_runner = None  # Keep reference to prevent garbage collection
 
     async def setup_hook(self) -> None:
         logging.info("Setting up bot cogs and views...")
@@ -357,12 +358,15 @@ class FloridaRPBot(commands.Bot):
         app.router.add_route("*", "/health", handle_health)
         app.router.add_post("/apply", handle_apply)
         app.router.add_options("/apply", handle_options)
-        runner = web.AppRunner(app)
-        await runner.setup()
-        logging.info("Starting web server on %s:%s", "0.0.0.0", self.config["port"])
-        site = web.TCPSite(runner, "0.0.0.0", self.config["port"])
-        await site.start()
-        logging.info("Web server running on port %s", self.config["port"])
+        try:
+            self.web_runner = web.AppRunner(app)
+            await self.web_runner.setup()
+            logging.info("Starting web server on %s:%s", "0.0.0.0", self.config["port"])
+            site = web.TCPSite(self.web_runner, "0.0.0.0", self.config["port"])
+            await site.start()
+            logging.info("Web server running on port %s", self.config["port"])
+        except Exception as e:
+            logging.exception("Failed to start web server: %s", e)
 
     async def on_raw_message_create(self, payload) -> None:
         if not payload.webhook_id:
