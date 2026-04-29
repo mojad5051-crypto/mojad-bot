@@ -277,6 +277,18 @@ class FloridaRPBot(commands.Bot):
     async def on_ready(self) -> None:
         logging.info("Logged in as %s (%s)", self.user, self.user.id)
         logging.info("Connected to guild %s", self.config["guild_id"])
+        # Start heartbeat task
+        if not hasattr(self, 'heartbeat_task'):
+            self.heartbeat_task = asyncio.create_task(self._heartbeat())
+
+    async def _heartbeat(self) -> None:
+        """Periodic heartbeat to verify bot is alive"""
+        while True:
+            try:
+                await asyncio.sleep(30)
+                logging.info("Heartbeat: Bot is alive, web_runner=%s", "started" if self.web_runner else "not started")
+            except Exception as e:
+                logging.exception("Heartbeat error: %s", e)
 
     async def start_web_server(self) -> None:
         logging.info("start_web_server() called - setting up routes...")
@@ -362,14 +374,18 @@ class FloridaRPBot(commands.Bot):
         app.router.add_post("/apply", handle_apply)
         app.router.add_options("/apply", handle_options)
         try:
+            logging.info("Creating AppRunner...")
             self.web_runner = web.AppRunner(app)
+            logging.info("Setting up AppRunner...")
             await self.web_runner.setup()
-            logging.info("Starting web server on %s:%s", "0.0.0.0", self.config["port"])
+            logging.info("Creating TCPSite on 0.0.0.0:%s...", self.config["port"])
             site = web.TCPSite(self.web_runner, "0.0.0.0", self.config["port"])
+            logging.info("Starting TCPSite...")
             await site.start()
-            logging.info("Web server running on port %s", self.config["port"])
+            logging.info("Web server successfully started on port %s", self.config["port"])
         except Exception as e:
-            logging.exception("Failed to start web server: %s", e)
+            logging.exception("CRITICAL: Failed to start web server: %s", e)
+            raise
 
     async def on_raw_message_create(self, payload) -> None:
         if not payload.webhook_id:
