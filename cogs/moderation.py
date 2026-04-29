@@ -234,20 +234,28 @@ class ModerationCog(commands.Cog):
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
 
-    @app_commands.command(name="embed", description="Send a custom embed with your text")
+    @app_commands.command(name="embed", description="Send a custom embed with multiple sections")
     @app_commands.describe(
-        title="Title of the embed",
-        description="Description/content of the embed",
+        header="Main header/title of the embed",
+        title1="First section title",
+        description1="First section description",
+        title2="Second section title",
+        description2="Second section description",
+        footer="Footer text",
         color="Color code (default: blue)"
     )
     async def embed_command(
         self,
         interaction: discord.Interaction,
-        title: str,
-        description: str,
+        header: str,
+        title1: str,
+        description1: str,
+        title2: str,
+        description2: str,
+        footer: str,
         color: str = "3498DB"
     ) -> None:
-        """Send a custom embed"""
+        """Send a custom embed with multiple fields"""
         # Check permissions
         has_role = any(role.id == self.bot.config["staff_role_id"] for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.manage_guild or has_role):
@@ -261,12 +269,13 @@ class ModerationCog(commands.Cog):
             color_int = 0x3498DB  # Default blue
 
         embed = discord.Embed(
-            title=title,
-            description=description,
+            title=header,
             color=color_int
         )
+        embed.add_field(name=title1, value=description1, inline=False)
+        embed.add_field(name=title2, value=description2, inline=False)
+        embed.set_footer(text=footer)
         embed.timestamp = discord.utils.utcnow()
-        embed.set_footer(text=f"Sent by {interaction.user.name}")
 
         await interaction.response.send_message(embed=embed)
 
