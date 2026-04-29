@@ -36,10 +36,19 @@ def load_config() -> dict:
         raise ValueError("DISCORD_TOKEN environment variable is required. Set it in Railway or create a .env file locally.")
     
     config["guild_id"] = int(os.getenv("GUILD_ID", "0"))
+    if config["guild_id"] == 0:
+        raise ValueError("GUILD_ID environment variable is required and must be a valid Discord server ID.")
+
     config["review_channel_id"] = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
+    if config["review_channel_id"] == 0:
+        raise ValueError("REVIEW_CHANNEL_ID environment variable is required and must be a valid channel ID.")
+
     config["infraction_log_channel_id"] = int(os.getenv("INFRACTION_LOG_CHANNEL_ID", "0"))
     config["promotion_log_channel_id"] = int(os.getenv("PROMOTION_LOG_CHANNEL_ID", "0"))
     config["staff_role_id"] = int(os.getenv("STAFF_ROLE_ID", "0"))
+    if config["staff_role_id"] == 0:
+        raise ValueError("STAFF_ROLE_ID environment variable is required and must be a valid role ID.")
+
     config["embed_color"] = int(os.getenv("EMBED_COLOR", "1973790"))
     config["panel_banner_url"] = os.getenv("PANEL_BANNER_URL", "")
     config["logo_url"] = os.getenv("LOGO_URL", "")
@@ -266,6 +275,9 @@ class FloridaRPBot(commands.Bot):
         logging.info("Connected to guild %s", self.config["guild_id"])
 
     async def start_web_server(self) -> None:
+        async def handle_health(request: web.Request) -> web.Response:
+            return web.Response(text="OK", status=200)
+
         async def handle_apply(request: web.Request) -> web.Response:
             logging.info("Received application submission request")
             try:
@@ -339,6 +351,7 @@ class FloridaRPBot(commands.Bot):
             return web.Response(status=204, headers=CORS_HEADERS)
 
         app = web.Application()
+        app.router.add_get("/", handle_health)
         app.router.add_post("/apply", handle_apply)
         app.router.add_options("/apply", handle_options)
         runner = web.AppRunner(app)
