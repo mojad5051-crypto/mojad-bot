@@ -53,6 +53,7 @@ def load_config() -> dict:
     config["panel_banner_url"] = os.getenv("PANEL_BANNER_URL", "")
     config["logo_url"] = os.getenv("LOGO_URL", "")
     config["port"] = int(os.getenv("PORT", "8080"))
+    logging.info("Loaded config: guild=%s review_channel=%s port=%s", config["guild_id"], config["review_channel_id"], config["port"])
     
     return config
 
@@ -352,10 +353,12 @@ class FloridaRPBot(commands.Bot):
 
         app = web.Application()
         app.router.add_get("/", handle_health)
+        app.router.add_get("/health", handle_health)
         app.router.add_post("/apply", handle_apply)
         app.router.add_options("/apply", handle_options)
         runner = web.AppRunner(app)
         await runner.setup()
+        logging.info("Starting web server on %s:%s", "0.0.0.0", self.config["port"])
         site = web.TCPSite(runner, "0.0.0.0", self.config["port"])
         await site.start()
         logging.info("Web server running on port %s", self.config["port"])
