@@ -234,6 +234,86 @@ class ModerationCog(commands.Cog):
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
 
+    @app_commands.command(name="embed", description="Send a custom embed with your text")
+    @app_commands.describe(
+        title="Title of the embed",
+        description="Description/content of the embed",
+        color="Color code (default: blue)"
+    )
+    async def embed_command(
+        self,
+        interaction: discord.Interaction,
+        title: str,
+        description: str,
+        color: str = "3498DB"
+    ) -> None:
+        """Send a custom embed"""
+        # Check permissions
+        has_role = any(role.id == self.bot.config["staff_role_id"] for role in interaction.user.roles)
+        if not (interaction.user.guild_permissions.manage_guild or has_role):
+            await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
+            return
+
+        # Convert color hex to int
+        try:
+            color_int = int(color.replace("#", ""), 16)
+        except ValueError:
+            color_int = 0x3498DB  # Default blue
+
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=color_int
+        )
+        embed.timestamp = discord.utils.utcnow()
+        embed.set_footer(text=f"Sent by {interaction.user.name}")
+
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="application", description="Send moderator application form")
+    async def application_command(self, interaction: discord.Interaction) -> None:
+        """Send moderator application embed with link to website"""
+        # Create the application embed
+        embed = discord.Embed(
+            title="📋 MODERATOR APPLICATION",
+            description="Interested in becoming a moderator? Apply now!",
+            color=0x6366f1  # Indigo color
+        )
+        embed.set_thumbnail(url=self.bot.config.get("logo_url", ""))
+        embed.add_field(
+            name="📝 Application Form",
+            value="Click the button below to access the moderator application form.",
+            inline=False
+        )
+        embed.add_field(
+            name="⏱️ Processing Time",
+            value="Applications are reviewed within 24-48 hours.",
+            inline=False
+        )
+        embed.add_field(
+            name="✅ Requirements",
+            value="• Must be 15+ years old\n• Active in the community\n• Good communication skills",
+            inline=False
+        )
+        embed.timestamp = discord.utils.utcnow()
+        embed.set_footer(text="Staff Team • Glass UI")
+
+        # Create button view
+        class ApplicationView(discord.ui.View):
+            def __init__(self, website_url: str):
+                super().__init__(timeout=None)
+                self.add_item(discord.ui.Button(
+                    label="Apply Now",
+                    style=discord.ButtonStyle.link,
+                    url=website_url,
+                    emoji="🚀"
+                ))
+
+        website_url = "https://mojad5051-crypto.github.io/apply.html"
+        view = ApplicationView(website_url)
+
+        await interaction.response.send_message(embed=embed, view=view)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(ModerationCog(bot))
