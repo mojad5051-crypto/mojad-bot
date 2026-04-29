@@ -270,7 +270,8 @@ class FloridaRPBot(commands.Bot):
         self.tree.clear_commands(guild=guild)
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
-        await self.start_web_server()
+        # Schedule web server startup as background task
+        self.loop.create_task(self.start_web_server())
 
     async def on_ready(self) -> None:
         logging.info("Logged in as %s (%s)", self.user, self.user.id)
