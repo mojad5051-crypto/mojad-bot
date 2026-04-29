@@ -54,7 +54,7 @@ def load_config() -> dict:
     config["panel_banner_url"] = os.getenv("PANEL_BANNER_URL", "")
     config["logo_url"] = os.getenv("LOGO_URL", "")
     config["port"] = int(os.getenv("PORT", "8080"))
-    logging.info("Loaded config: guild=%s review_channel=%s port=%s", config["guild_id"], config["review_channel_id"], config["port"])
+    logging.info("Config loaded: guild=%s, review_channel=%s, port=%s, PORT_env=%s", config["guild_id"], config["review_channel_id"], config["port"], os.getenv("PORT", "NOT_SET"))
     
     return config
 
@@ -279,8 +279,9 @@ class FloridaRPBot(commands.Bot):
         logging.info("Connected to guild %s", self.config["guild_id"])
 
     async def start_web_server(self) -> None:
+        logging.info("start_web_server() called - setting up routes...")
         async def handle_health(request: web.Request) -> web.Response:
-            logging.info("Health check request received: %s %s", request.method, request.path)
+            logging.info("Health check request: %s %s from %s", request.method, request.path, request.remote)
             return web.Response(text="OK", status=200, headers=CORS_HEADERS)
 
         async def handle_apply(request: web.Request) -> web.Response:
