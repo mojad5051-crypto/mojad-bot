@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import asyncio
 from pathlib import Path
 
 import discord
@@ -271,7 +272,7 @@ class FloridaRPBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         # Schedule web server startup as background task
-        self.loop.create_task(self.start_web_server())
+        asyncio.create_task(self.start_web_server())
 
     async def on_ready(self) -> None:
         logging.info("Logged in as %s (%s)", self.user, self.user.id)
