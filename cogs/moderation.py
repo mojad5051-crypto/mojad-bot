@@ -318,7 +318,7 @@ class ModerationCog(commands.Cog):
                     emoji="🚀"
                 ))
 
-        website_url = "https://mojad5051-crypto.github.io/apply.html"
+        website_url = "https://mojad5051-crypto.github.io/mojad/apply.html"
         view = ApplicationView(website_url)
 
         await interaction.response.send_message(embed=embed, view=view)
