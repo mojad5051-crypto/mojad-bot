@@ -1,135 +1,42 @@
 #!/usr/bin/env python3
-# Simple working bot for Floyd State Roleplay
-
 import os
-import logging
-import json
-from pathlib import Path
-
-import discord
-from discord.ext import commands
-from discord import app_commands
 from aiohttp import web
+from discord.ext import tasks
+import discord
 from dotenv import load_dotenv
-
-# Setup logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+import asyncio
 
 load_dotenv()
 
-# Configuration
-TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID", "0"))
-REVIEW_CHANNEL_ID = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
-STAFF_ROLE_ID = int(os.getenv("STAFF_ROLE_ID", "0"))
+TOKEN = os.getenv("DISCORD_TOKEN", "test-token")
 PORT = int(os.getenv("PORT", "8080"))
 
-if not TOKEN or GUILD_ID == 0 or REVIEW_CHANNEL_ID == 0 or STAFF_ROLE_ID == 0:
-    logger.error("Missing required environment variables")
-    exit(1)
+async def test_handler(request):
+    return web.Response(text="OK", status=200)
 
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
-    "Access-Control-Allow-Headers": "Content-Type"
-}
-
-
-class FloridaRPBot(commands.Bot):
-    def __init__(self):
-        intents = discord.Intents.default()
-        intents.members = True
-        intents.message_content = True
-        intents.guilds = True
-        intents.reactions = True
-        
-        super().__init__(command_prefix="!", intents=intents)
-        self.web_runner = None
+async def start_http_server():
+    app = web.Application()
+    app.router.add_get("/", test_handler)
+    app.router.add_get("/health", test_handler)
     
-    async def setup_hook(self):
-        logger.info("setup_hook called")
-        # Try to load cogs
-        cog_files = [
-            "cogs.moderation",
-            "cogs.applications",
-            "cogs.training"
-        ]
-        for cog_module in cog_files:
-            try:
-                await self.load_extension(cog_module)
-                logger.info(f"Loaded cog: {cog_module}")
-            except Exception as e:
-                logger.error(f"Failed to load cog {cog_module}: {e}")
-        
-        # Sync commands
-        guild = discord.Object(id=GUILD_ID)
-        self.tree.copy_global_to(guild=guild)
-        try:
-            await self.tree.sync(guild=guild)
-            logger.info("Synced commands")
-        except Exception as e:
-            logger.error(f"Failed to sync commands: {e}")
-        
-        # Start web server
-        await self.start_web_server()
-    
-    async def on_ready(self):
-        logger.info(f"Logged in as {self.user} ({self.user.id})")
-    
-    async def start_web_server(self):
-        logger.info("Starting web server...")
-        
-        async def handler(request):
-            logger.info(f"Request: {request.method} {request.path}")
-            
-            if request.path == "/health" or request.path == "/":
-                return web.Response(text="OK", status=200, headers=CORS_HEADERS)
-            
-            if request.path == "/apply" and request.method == "POST":
-                try:
-                    data = await request.json()
-                    logger.info(f"Application received: {data.get('robloxUsername', 'unknown')}")
-                    
-                    # Send to Discord
-                    channel = self.get_channel(REVIEW_CHANNEL_ID)
-                    if channel:
-                        embed = discord.Embed(
-                            title="Moderator Application",
-                            description="New application submitted",
-                            color=0x1e40af
-                        )
-                        embed.add_field(name="Roblox Username", value=data.get("robloxUsername", "N/A"))
-                        embed.add_field(name="Discord Username", value=data.get("discordUsername", "N/A"))
-                        embed.add_field(name="Age", value=str(data.get("age", "N/A")))
-                        
-                        await channel.send(embed=embed)
-                        logger.info("Application sent to Discord")
-                    
-                    return web.json_response({"success": True}, headers=CORS_HEADERS)
-                except Exception as e:
-                    logger.exception(f"Error processing application: {e}")
-                    return web.json_response({"success": False, "error": str(e)}, status=500, headers=CORS_HEADERS)
-            
-            if request.path == "/apply" and request.method == "OPTIONS":
-                return web.Response(status=204, headers=CORS_HEADERS)
-            
-            return web.Response(text="Not found", status=404, headers=CORS_HEADERS)
-        
-        try:
-            app = web.Application()
-            app.router.add_route("*", "/{path_info:.*}", handler)
-            
-            self.web_runner = web.AppRunner(app)
-            await self.web_runner.setup()
-            
-            site = web.TCPSite(self.web_runner, "0.0.0.0", PORT)
-            await site.start()
-            logger.info(f"Web server started on port {PORT}")
-        except Exception as e:
-            logger.exception(f"Web server startup failed: {e}")
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    print(f"HTTP server running on port {PORT}")
+    return runner
 
+async def main():
+    runner = await start_http_server()
+    
+    # Keep the async function running
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        await runner.cleanup()
 
 if __name__ == "__main__":
-    bot = FloridaRPBot()
-    bot.run(TOKEN)
+    asyncio.run(main())
