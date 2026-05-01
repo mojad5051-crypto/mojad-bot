@@ -655,6 +655,18 @@ class ModerationCog(commands.Cog):
         await self._refresh_ssu_panels_once()
         await interaction.response.send_message(f"Session state updated to **{new_state}**.", ephemeral=True)
 
+        # Notify session role in-channel so members get pinged.
+        try:
+            notify_role_id = 1497021079842193558
+            notify_text = (
+                f"<@&{notify_role_id}> **Session Started** — the server is now online."
+                if new_state == "Started"
+                else f"<@&{notify_role_id}> **Session Shutdown** — the server is now offline."
+            )
+            await interaction.channel.send(notify_text)
+        except Exception:
+            pass
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(ModerationCog(bot))
