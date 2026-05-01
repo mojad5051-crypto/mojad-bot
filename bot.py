@@ -31,10 +31,10 @@ PANEL_BANNER_URL = os.getenv("PANEL_BANNER_URL", "https://imgur.com/WxeW12e")
 LOGO_URL = os.getenv("LOGO_URL", "https://imgur.com/WxeW12e")
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "data/database.db"))
 
-if not TOKEN or GUILD_ID == 0 or REVIEW_CHANNEL_ID == 0 or STAFF_ROLE_ID == 0:
+if not TOKEN or GUILD_ID == 0 or REVIEW_CHANNEL_ID == 0:
     logger.error(
         "Missing required environment variables. "
-        "DISCORD_TOKEN, GUILD_ID, REVIEW_CHANNEL_ID, and STAFF_ROLE_ID must all be set."
+        "DISCORD_TOKEN, GUILD_ID, and REVIEW_CHANNEL_ID must all be set."
     )
     sys.exit(1)
 
