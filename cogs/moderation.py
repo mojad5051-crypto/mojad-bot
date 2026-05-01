@@ -1,6 +1,8 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
+import aiohttp
+import time
 
 
 def get_bot_config(bot: commands.Bot) -> dict:
@@ -106,9 +108,179 @@ class InfractionView(discord.ui.View):
         self.add_item(button)
 
 
+class SessionRoleToggleButton(discord.ui.Button):
+    def __init__(self, bot: commands.Bot):
+        super().__init__(label="Session Role", style=discord.ButtonStyle.secondary, custom_id="ssu_toggle_role")
+        self.bot = bot
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("This button only works in a server.", ephemeral=True)
+            return
+
+        config = get_bot_config(self.bot)
+        session_role_id = int(config.get("session_role_id", 0) or 0)
+        if session_role_id == 0:
+            await interaction.response.send_message("Session role is not configured yet.", ephemeral=True)
+            return
+
+        role = interaction.guild.get_role(session_role_id)
+        if role is None:
+            await interaction.response.send_message("Configured session role was not found in this server.", ephemeral=True)
+            return
+
+        if role in interaction.user.roles:
+            await interaction.user.remove_roles(role, reason="SSU panel role toggle")
+            await interaction.response.send_message(f"Removed {role.mention}.", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role, reason="SSU panel role toggle")
+            await interaction.response.send_message(f"Added {role.mention}.", ephemeral=True)
+
+
+class SSUPanelView(discord.ui.View):
+    def __init__(self, bot: commands.Bot):
+        super().__init__(timeout=None)
+        config = get_bot_config(bot)
+        self.add_item(SessionRoleToggleButton(bot))
+        join_url = str(config.get("server_online_url", "") or "").strip()
+        if join_url:
+            self.add_item(discord.ui.Button(label="Server Online", style=discord.ButtonStyle.link, url=join_url))
+
+
 class ModerationCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._ssu_panels: dict[int, tuple[int, int]] = {}
+        self._http_session: aiohttp.ClientSession | None = None
+        self.ssu_refresh_loop.start()
+
+    def cog_unload(self) -> None:
+        self.ssu_refresh_loop.cancel()
+
+    async def _ensure_http_session(self) -> aiohttp.ClientSession:
+        if self._http_session is None or self._http_session.closed:
+            self._http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15))
+        return self._http_session
+
+    def _safe_int(self, value, default: int = 0) -> int:
+        try:
+            return int(value)
+        except Exception:
+            return default
+
+    def _pick_stat(self, payload: dict, *keys: str, default: str = "N/A") -> str:
+        for key in keys:
+            if key in payload and payload[key] is not None:
+                return str(payload[key])
+        return default
+
+    async def _fetch_ssu_stats(self) -> tuple[dict, bool]:
+        config = get_bot_config(self.bot)
+        api_url = str(config.get("ssu_api_url", "") or "").strip()
+        api_key = str(config.get("ssu_api_key", "") or "").strip()
+        if not api_url or not api_key:
+            return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+
+        try:
+            session = await self._ensure_http_session()
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "x-api-key": api_key,
+                "X-API-Key": api_key,
+                "Accept": "application/json",
+            }
+            async with session.get(api_url, headers=headers) as response:
+                if response.status != 200:
+                    return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+                payload = await response.json()
+                if not isinstance(payload, dict):
+                    return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+
+                players_raw = self._pick_stat(payload, "playerCount", "player_count", "players", "currentPlayers")
+                max_players = self._safe_int(self._pick_stat(payload, "maxPlayers", "max_players", "capacity", default="0"), 0)
+                players_int = self._safe_int(players_raw, 0)
+                status_raw = self._pick_stat(payload, "serverStatus", "server_status", "status", "state", default="Online")
+                status = status_raw
+                if max_players > 0 and players_int >= max_players:
+                    status = "Full"
+
+                stats = {
+                    "status": status,
+                    "players": players_raw,
+                    "staff": self._pick_stat(payload, "staffOnline", "staff_online", "staffCount", "staff", default="N/A"),
+                    "queue": self._pick_stat(payload, "queueCount", "queue_count", "queue", default="N/A"),
+                    "server_name": self._pick_stat(payload, "serverName", "server_name", default=str(config.get("ssu_server_name", "Florida Sessions Roleplay"))),
+                    "server_code": self._pick_stat(payload, "serverCode", "server_code", default=str(config.get("ssu_server_code", "N/A"))),
+                }
+                return stats, True
+        except Exception:
+            return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+
+    def _build_ssu_embed(self, *, stats: dict, api_ok: bool) -> discord.Embed:
+        config = get_bot_config(self.bot)
+        now_ts = int(time.time())
+        embed = discord.Embed(
+            title="🌆 Florida Sessions Roleplay",
+            description=(
+                "Get updates on live player counts, queue status, and online staff.\n"
+                "This panel updates automatically every 30 seconds."
+            ),
+            color=(0x2ECC71 if api_ok else 0xE74C3C),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="📊 Server Status",
+            value=(
+                f"- **Player Count:** {stats.get('players', 'N/A')}\n"
+                f"- **Staff Online:** {stats.get('staff', 'N/A')}\n"
+                f"- **Queue Count:** {stats.get('queue', 'N/A')}\n"
+                f"- **Server Status:** {stats.get('status', 'N/A')}\n"
+                f"- **Last Updated:** <t:{now_ts}:R>"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🖥️ Server Information",
+            value=(
+                f"- **Server Name:** {stats.get('server_name', config.get('ssu_server_name', 'Florida Sessions Roleplay'))}\n"
+                f"- **Server Owner:** {config.get('ssu_server_owner', 'Florida Sessions Management')}\n"
+                f"- **Server Code:** {stats.get('server_code', config.get('ssu_server_code', 'N/A'))}"
+            ),
+            inline=False,
+        )
+        if not api_ok:
+            embed.set_footer(text="API Offline - retrying every 30 seconds")
+        else:
+            embed.set_footer(text="Live dashboard refreshes every 30 seconds")
+        return embed
+
+    @tasks.loop(seconds=30)
+    async def ssu_refresh_loop(self) -> None:
+        if not self._ssu_panels:
+            return
+        stats, api_ok = await self._fetch_ssu_stats()
+        embed = self._build_ssu_embed(stats=stats, api_ok=api_ok)
+        stale_message_ids: list[int] = []
+        for message_id, (guild_id, channel_id) in list(self._ssu_panels.items()):
+            guild = self.bot.get_guild(guild_id)
+            if guild is None:
+                stale_message_ids.append(message_id)
+                continue
+            channel = guild.get_channel(channel_id)
+            if channel is None or not isinstance(channel, discord.TextChannel):
+                stale_message_ids.append(message_id)
+                continue
+            try:
+                message = await channel.fetch_message(message_id)
+                await message.edit(embed=embed, view=SSUPanelView(self.bot))
+            except Exception:
+                stale_message_ids.append(message_id)
+        for message_id in stale_message_ids:
+            self._ssu_panels.pop(message_id, None)
+
+    @ssu_refresh_loop.before_loop
+    async def before_ssu_refresh_loop(self) -> None:
+        await self.bot.wait_until_ready()
 
     @app_commands.command(name="infract", description="Issue an infraction to a user by assigning a role")
     @app_commands.choices(status=[
@@ -334,6 +506,22 @@ class ModerationCog(commands.Cog):
         view = ApplicationView(website_url)
 
         await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.command(name="ssu", description="Post a live server status dashboard that updates every 30 seconds.")
+    async def ssu_command(self, interaction: discord.Interaction) -> None:
+        bot_config = get_bot_config(self.bot)
+        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
+        if not (interaction.user.guild_permissions.administrator or has_role):
+            await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
+            return
+
+        stats, api_ok = await self._fetch_ssu_stats()
+        embed = self._build_ssu_embed(stats=stats, api_ok=api_ok)
+        view = SSUPanelView(self.bot)
+        await interaction.response.send_message(embed=embed, view=view)
+        message = await interaction.original_response()
+        if interaction.guild is not None:
+            self._ssu_panels[message.id] = (interaction.guild.id, interaction.channel_id)
 
 
 async def setup(bot: commands.Bot) -> None:

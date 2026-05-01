@@ -368,6 +368,13 @@ class FloridaRPBot(commands.Bot):
             "embed_color": EMBED_COLOR,
             "panel_banner_url": PANEL_BANNER_URL,
             "logo_url": LOGO_URL,
+            "ssu_api_key": os.getenv("SSU_API_KEY", ""),
+            "ssu_api_url": os.getenv("SSU_API_URL", ""),
+            "ssu_server_name": os.getenv("SSU_SERVER_NAME", "Florida Sessions Roleplay"),
+            "ssu_server_owner": os.getenv("SSU_SERVER_OWNER", "Florida Sessions Management"),
+            "ssu_server_code": os.getenv("SSU_SERVER_CODE", "N/A"),
+            "session_role_id": int(os.getenv("SESSION_ROLE_ID", "0") or "0"),
+            "server_online_url": os.getenv("SERVER_ONLINE_URL", ""),
         })
     
     async def setup_hook(self):
