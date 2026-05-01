@@ -409,7 +409,8 @@ class FloridaRPBot(commands.Bot):
 
                 embed = build_application_embed(data)
                 view = ApplicationReviewView(self, data)
-                applicant_mention = f"<@{data.get('discordUserId', '')}>"
+                applicant_id_raw = str(data.get("discordUserId", "")).strip()
+                applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "`Unknown applicant ID`"
                 await channel.send(
                     content=(
                         f"<@&{STAFF_ROLE_ID}> {applicant_mention} A new moderator application has been submitted for review. "
