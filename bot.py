@@ -78,7 +78,13 @@ def build_application_embed(data: dict) -> discord.Embed:
     return embed
 
 
-def build_decision_embed(data: dict, accepted: bool, reviewer: discord.Member, role_assigned: bool) -> discord.Embed:
+def build_decision_embed(
+    data: dict,
+    accepted: bool,
+    reviewer: discord.Member,
+    role_assigned: bool,
+    reason: str,
+) -> discord.Embed:
     if accepted:
         title = "Moderator Application Approved"
         description = (
@@ -98,13 +104,21 @@ def build_decision_embed(data: dict, accepted: bool, reviewer: discord.Member, r
     embed.add_field(name="Applicant", value=data.get("discordUsername", "N/A"), inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
     embed.add_field(name="Reviewed By", value=reviewer.display_name, inline=True)
-    embed.add_field(name="Review Outcome", value="Accepted" if accepted else "Denied", inline=True)
+    embed.add_field(name="Decision", value="Accepted" if accepted else "Denied", inline=True)
+    embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
     embed.add_field(name="Role Granted", value="Yes" if role_assigned else "No", inline=False)
     embed.set_footer(text="Florida State Roleplay Staff Review")
     return embed
 
 
-def build_log_embed(data: dict, accepted: bool, reviewer: discord.Member, role_assigned: bool, applicant_member: discord.Member | None) -> discord.Embed:
+def build_log_embed(
+    data: dict,
+    accepted: bool,
+    reviewer: discord.Member,
+    role_assigned: bool,
+    applicant_member: discord.Member | None,
+    reason: str,
+) -> discord.Embed:
     status = "Accepted" if accepted else "Denied"
     color = 0x2ECC71 if accepted else 0xE74C3C
     embed = discord.Embed(
@@ -116,6 +130,7 @@ def build_log_embed(data: dict, accepted: bool, reviewer: discord.Member, role_a
     embed.add_field(name="Applicant", value=data.get("discordUsername", "N/A"), inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
     embed.add_field(name="Decision", value=status, inline=True)
+    embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
     embed.add_field(name="Role Granted", value="Yes" if role_assigned else "No", inline=True)
     embed.add_field(name="Applicant in Guild", value="Yes" if applicant_member else "No", inline=True)
     embed.add_field(name="Submitted At", value=data.get("submittedAt", "N/A"), inline=False)
@@ -139,7 +154,7 @@ class ApplicationReviewView(discord.ui.View):
         for child in self.children:
             child.disabled = True
 
-    async def handle_decision(self, interaction: discord.Interaction, accepted: bool):
+    async def handle_decision(self, interaction: discord.Interaction, accepted: bool, reason: str):
         if self.processed:
             await interaction.response.send_message("This application has already been processed.", ephemeral=True)
             return
@@ -149,9 +164,7 @@ class ApplicationReviewView(discord.ui.View):
             return
 
         self.processed = True
-        await self.disable_buttons()
         await interaction.response.defer(ephemeral=True)
-        await interaction.message.edit(view=self)
 
         application = self.application_data
         reviewer = interaction.user
@@ -177,8 +190,41 @@ class ApplicationReviewView(discord.ui.View):
             except Exception as e:
                 logger.warning(f"Failed to assign accepted role: {e}")
 
-        await send_applicant_dm(self.bot, application, accepted, reviewer, accepted_role_assigned)
-        await log_application_decision(self.bot, application, accepted, reviewer, accepted_role_assigned, applicant_member)
+        await send_applicant_dm(self.bot, application, accepted, reviewer, accepted_role_assigned, reason)
+        await log_application_decision(
+            self.bot,
+            application,
+            accepted,
+            reviewer,
+            accepted_role_assigned,
+            applicant_member,
+            reason,
+        )
+
+        # Update review message: remove raw ID field and show decision details.
+        if interaction.message and interaction.message.embeds:
+            original = interaction.message.embeds[0]
+            updated = discord.Embed(
+                title=original.title,
+                description=original.description,
+                color=(0x2ECC71 if accepted else 0xE74C3C),
+                timestamp=original.timestamp,
+            )
+            for field in original.fields:
+                if field.name == "Discord ID":
+                    continue
+                updated.add_field(name=field.name, value=field.value, inline=field.inline)
+
+            applicant_id_raw = str(application.get("discordUserId", "")).strip()
+            applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else application.get("discordUsername", "N/A")
+            updated.add_field(name="Applicant", value=applicant_mention, inline=True)
+            updated.add_field(name="Reviewed By", value=reviewer.mention, inline=True)
+            updated.add_field(name="Decision", value=("Accepted" if accepted else "Denied"), inline=True)
+            updated.add_field(name="Reason", value=(reason or "No reason provided."), inline=False)
+            updated.set_footer(text=original.footer.text if original.footer else None)
+
+            await self.disable_buttons()
+            await interaction.message.edit(embed=updated, view=self)
 
         await interaction.followup.send(
             f"Application {'accepted' if accepted else 'denied'}. Applicant has been notified.",
@@ -187,25 +233,62 @@ class ApplicationReviewView(discord.ui.View):
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, custom_id="app_accept")
     async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_decision(interaction, accepted=True)
+        await interaction.response.send_modal(ReviewReasonModal(self, accepted=True))
 
     @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="app_deny")
     async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_decision(interaction, accepted=False)
+        await interaction.response.send_modal(ReviewReasonModal(self, accepted=False))
 
 
-async def send_applicant_dm(bot: commands.Bot, data: dict, accepted: bool, reviewer: discord.Member, role_assigned: bool):
+class ReviewReasonModal(discord.ui.Modal, title="Application Review Reason"):
+    reason = discord.ui.TextInput(
+        label="Reason for this decision",
+        style=discord.TextStyle.long,
+        required=True,
+        max_length=1000,
+        placeholder="Enter the reason sent to the applicant and logs.",
+    )
+
+    def __init__(self, review_view: ApplicationReviewView, accepted: bool):
+        super().__init__()
+        self.review_view = review_view
+        self.accepted = accepted
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.review_view.handle_decision(
+            interaction,
+            accepted=self.accepted,
+            reason=self.reason.value.strip(),
+        )
+
+
+async def send_applicant_dm(
+    bot: commands.Bot,
+    data: dict,
+    accepted: bool,
+    reviewer: discord.Member,
+    role_assigned: bool,
+    reason: str,
+):
     try:
         user = await bot.fetch_user(int(str(data.get("discordUserId", "0")).strip() or 0))
         if user is None:
             return
-        embed = build_decision_embed(data, accepted, reviewer, role_assigned)
+        embed = build_decision_embed(data, accepted, reviewer, role_assigned, reason)
         await user.send(embed=embed)
     except Exception as e:
         logger.warning(f"Failed to DM applicant: {e}")
 
 
-async def log_application_decision(bot: commands.Bot, data: dict, accepted: bool, reviewer: discord.Member, role_assigned: bool, applicant_member: discord.Member | None):
+async def log_application_decision(
+    bot: commands.Bot,
+    data: dict,
+    accepted: bool,
+    reviewer: discord.Member,
+    role_assigned: bool,
+    applicant_member: discord.Member | None,
+    reason: str,
+):
     channel = bot.get_channel(LOG_CHANNEL_ID)
     if channel is None:
         try:
@@ -214,7 +297,7 @@ async def log_application_decision(bot: commands.Bot, data: dict, accepted: bool
             logger.warning(f"Failed to fetch log channel: {e}")
             return
 
-    embed = build_log_embed(data, accepted, reviewer, role_assigned, applicant_member)
+    embed = build_log_embed(data, accepted, reviewer, role_assigned, applicant_member, reason)
     await channel.send(embed=embed)
 
 
@@ -290,9 +373,10 @@ class FloridaRPBot(commands.Bot):
 
                 embed = build_application_embed(data)
                 view = ApplicationReviewView(self, data)
+                applicant_mention = f"<@{data.get('discordUserId', '')}>"
                 await channel.send(
                     content=(
-                        f"<@&{STAFF_ROLE_ID}> A new moderator application has been submitted for review. "
+                        f"<@&{STAFF_ROLE_ID}> {applicant_mention} A new moderator application has been submitted for review. "
                         "Please use the buttons below to Accept or Deny the application."
                     ),
                     embed=embed,
