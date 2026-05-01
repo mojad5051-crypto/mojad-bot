@@ -19,22 +19,22 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID", "0"))
-REVIEW_CHANNEL_ID = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
-STAFF_ROLE_ID = int(os.getenv("STAFF_ROLE_ID", "0"))
+REVIEW_CHANNEL_ID = int(os.getenv("REVIEW_CHANNEL_ID", "1497630261607792792"))
+STAFF_ROLE_ID = int(os.getenv("STAFF_ROLE_ID", "1496970697430536489"))
 INFRACTION_LOG_CHANNEL_ID = int(os.getenv("INFRACTION_LOG_CHANNEL_ID", str(REVIEW_CHANNEL_ID)))
 PROMOTION_LOG_CHANNEL_ID = int(os.getenv("PROMOTION_LOG_CHANNEL_ID", str(REVIEW_CHANNEL_ID)))
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", str(PROMOTION_LOG_CHANNEL_ID or INFRACTION_LOG_CHANNEL_ID or REVIEW_CHANNEL_ID)))
-ACCEPT_ROLE_ID = int(os.getenv("ACCEPT_ROLE_ID", "0"))
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "1497628703381917827"))
+ACCEPT_ROLE_ID = int(os.getenv("ACCEPT_ROLE_ID", "1496970734919094303"))
 PORT = int(os.getenv("PORT", "8080"))
 EMBED_COLOR = int(os.getenv("EMBED_COLOR", "1973790"))
 PANEL_BANNER_URL = os.getenv("PANEL_BANNER_URL", "https://imgur.com/WxeW12e")
 LOGO_URL = os.getenv("LOGO_URL", "https://imgur.com/WxeW12e")
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "data/database.db"))
 
-if not TOKEN or GUILD_ID == 0 or REVIEW_CHANNEL_ID == 0 or STAFF_ROLE_ID == 0:
+if not TOKEN or GUILD_ID == 0 or REVIEW_CHANNEL_ID == 0:
     logger.error(
         "Missing required environment variables. "
-        "DISCORD_TOKEN, GUILD_ID, REVIEW_CHANNEL_ID, and STAFF_ROLE_ID must all be set."
+        "DISCORD_TOKEN, GUILD_ID, and REVIEW_CHANNEL_ID must all be set."
     )
     sys.exit(1)
 
