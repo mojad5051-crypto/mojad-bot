@@ -53,6 +53,8 @@ SUPPORT_OPTIONS = {
     },
 }
 
+TICKET_TARGET_CHANNEL_ID = 1499770596622340157
+
 
 def roles_for_visibility(selected_key: str) -> list[int]:
     selected_rank = SUPPORT_OPTIONS[selected_key]["rank"]
@@ -169,12 +171,18 @@ class TicketActionView(discord.ui.View):
                 opener_name = sanitize_name(opener_member.name, fallback="user")
 
         new_name = f"🟢-{opener_name}-claimed-by-{sanitize_name(interaction.user.name, fallback='staff')}"
-        await interaction.channel.edit(
-            name=new_name[:95],
-            topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, claimed_by=interaction.user.id),
-            reason=f"Ticket claimed by {interaction.user}",
-        )
-        await interaction.response.send_message(f"Ticket claimed by {interaction.user.mention}.", ephemeral=False)
+        await interaction.response.defer(ephemeral=False, thinking=False)
+        try:
+            await interaction.channel.edit(
+                name=new_name[:95],
+                topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, claimed_by=interaction.user.id),
+                reason=f"Ticket claimed by {interaction.user}",
+            )
+            await interaction.followup.send(f"Ticket claimed by {interaction.user.mention}.", ephemeral=False)
+        except discord.Forbidden:
+            await interaction.followup.send("I could not claim this ticket (missing Manage Channels permission).", ephemeral=True)
+        except Exception as exc:
+            await interaction.followup.send(f"Failed to claim ticket: {exc}", ephemeral=True)
 
     @discord.ui.button(label="Unclaim", style=discord.ButtonStyle.secondary, custom_id="assist_unclaim")
     async def unclaim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -195,12 +203,18 @@ class TicketActionView(discord.ui.View):
                 opener_name = sanitize_name(str(opener_id), fallback="user")
 
         new_name = f"🔴-{opener_name}-assistance"
-        await interaction.channel.edit(
-            name=new_name[:95],
-            topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, claimed_by=None),
-            reason=f"Ticket unclaimed by {interaction.user}",
-        )
-        await interaction.response.send_message("Ticket unclaimed and reset to open status.", ephemeral=False)
+        await interaction.response.defer(ephemeral=False, thinking=False)
+        try:
+            await interaction.channel.edit(
+                name=new_name[:95],
+                topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, claimed_by=None),
+                reason=f"Ticket unclaimed by {interaction.user}",
+            )
+            await interaction.followup.send("Ticket unclaimed and reset to open status.", ephemeral=False)
+        except discord.Forbidden:
+            await interaction.followup.send("I could not unclaim this ticket (missing Manage Channels permission).", ephemeral=True)
+        except Exception as exc:
+            await interaction.followup.send(f"Failed to unclaim ticket: {exc}", ephemeral=True)
 
     @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="assist_close")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -243,6 +257,12 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
 
         ticket_name = f"🔴-{sanitize_name(interaction.user.name, fallback='user')}-assistance"
         category = interaction.channel.category if interaction.channel is not None else None
+        anchor_channel = interaction.guild.get_channel(TICKET_TARGET_CHANNEL_ID)
+        if anchor_channel is not None:
+            if isinstance(anchor_channel, discord.CategoryChannel):
+                category = anchor_channel
+            elif isinstance(anchor_channel, discord.TextChannel):
+                category = anchor_channel.category or category
 
         channel = await interaction.guild.create_text_channel(
             name=ticket_name[:95],
@@ -256,6 +276,12 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
             ),
             reason=f"Assistance ticket created by {interaction.user}",
         )
+        if anchor_channel is not None and isinstance(anchor_channel, discord.TextChannel):
+            try:
+                # Place tickets just under the configured anchor channel.
+                await channel.edit(position=anchor_channel.position + 1, reason="Position assistance ticket near configured anchor channel")
+            except Exception:
+                pass
 
         selected_role_mentions = " ".join(f"<@&{rid}>" for rid in selected_role_ids)
 
