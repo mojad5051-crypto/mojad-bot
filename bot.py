@@ -374,11 +374,12 @@ class FloridaRPBot(commands.Bot):
             "ssu_api_key": os.getenv("SSU_API_KEY", ""),
             "ssu_api_url": os.getenv("SSU_API_URL", ""),
             "ssu_server_name": os.getenv("SSU_SERVER_NAME", "Florida Sessions Roleplay"),
-            "ssu_server_owner": os.getenv("SSU_SERVER_OWNER", "Florida Sessions Management"),
-            "ssu_server_code": os.getenv("SSU_SERVER_CODE", "N/A"),
-            "session_role_id": int(os.getenv("SESSION_ROLE_ID", "0") or "0"),
+            "ssu_server_owner": os.getenv("SSU_SERVER_OWNER", "<@1311973437924966462>"),
+            "ssu_server_code": os.getenv("SSU_SERVER_CODE", "FLRPSAP"),
+            "session_role_id": int(os.getenv("SESSION_ROLE_ID", "1497021079842193558") or "1497021079842193558"),
             "server_online_url": os.getenv("SERVER_ONLINE_URL", ""),
         })
+        self.ssu_session_state = "Shutdown"
     
     async def setup_hook(self):
         logger.info("Setting up bot")

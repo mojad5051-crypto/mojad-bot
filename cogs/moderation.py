@@ -148,6 +148,8 @@ class SSUPanelView(discord.ui.View):
 
 
 class ModerationCog(commands.Cog):
+    ssu_group = app_commands.Group(name="ssu", description="Session dashboard commands")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._ssu_panels: dict[int, tuple[int, int]] = {}
@@ -235,6 +237,7 @@ class ModerationCog(commands.Cog):
     def _build_ssu_embed(self, *, stats: dict, api_ok: bool) -> discord.Embed:
         config = get_bot_config(self.bot)
         now_ts = int(time.time())
+        session_state = getattr(self.bot, "ssu_session_state", "Shutdown")
         embed = discord.Embed(
             title="🌆 Florida Sessions Roleplay",
             description=(
@@ -251,6 +254,7 @@ class ModerationCog(commands.Cog):
                 f"- **Staff Online:** {stats.get('staff', 'N/A')}\n"
                 f"- **Queue Count:** {stats.get('queue', 'N/A')}\n"
                 f"- **Server Status:** {stats.get('status', 'N/A')}\n"
+                f"- **Session State:** {session_state}\n"
                 f"- **Last Updated:** <t:{now_ts}:R>"
             ),
             inline=False,
@@ -270,8 +274,7 @@ class ModerationCog(commands.Cog):
             embed.set_footer(text="Live dashboard refreshes every 30 seconds")
         return embed
 
-    @tasks.loop(seconds=30)
-    async def ssu_refresh_loop(self) -> None:
+    async def _refresh_ssu_panels_once(self) -> None:
         if not self._ssu_panels:
             return
         stats, api_ok = await self._fetch_ssu_stats()
@@ -293,6 +296,10 @@ class ModerationCog(commands.Cog):
                 stale_message_ids.append(message_id)
         for message_id in stale_message_ids:
             self._ssu_panels.pop(message_id, None)
+
+    @tasks.loop(seconds=30)
+    async def ssu_refresh_loop(self) -> None:
+        await self._refresh_ssu_panels_once()
 
     @ssu_refresh_loop.before_loop
     async def before_ssu_refresh_loop(self) -> None:
@@ -523,8 +530,8 @@ class ModerationCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.command(name="ssu", description="Post a live server status dashboard that updates every 30 seconds.")
-    async def ssu_command(self, interaction: discord.Interaction) -> None:
+    @ssu_group.command(name="panel", description="Post a live server status dashboard that updates every 30 seconds.")
+    async def ssu_panel_command(self, interaction: discord.Interaction) -> None:
         bot_config = get_bot_config(self.bot)
         has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.administrator or has_role):
@@ -538,6 +545,22 @@ class ModerationCog(commands.Cog):
         message = await interaction.original_response()
         if interaction.guild is not None:
             self._ssu_panels[message.id] = (interaction.guild.id, interaction.channel_id)
+
+    @ssu_group.command(name="start-stop", description="Start or shut down the session state shown on the SSU panel.")
+    @app_commands.describe(action="Choose Start or Shutdown")
+    @app_commands.choices(action=[
+        app_commands.Choice(name="Start", value="start"),
+        app_commands.Choice(name="Shutdown", value="shutdown"),
+    ])
+    async def ssu_start_stop_command(self, interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Only administrators can use this command.", ephemeral=True)
+            return
+
+        new_state = "Started" if action.value == "start" else "Shutdown"
+        setattr(self.bot, "ssu_session_state", new_state)
+        await self._refresh_ssu_panels_once()
+        await interaction.response.send_message(f"Session state updated to **{new_state}**.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
