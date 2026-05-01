@@ -153,7 +153,13 @@ class ApplicationReviewView(discord.ui.View):
         for child in self.children:
             child.disabled = True
 
-    async def handle_decision(self, interaction: discord.Interaction, accepted: bool, reason: str):
+    async def handle_decision(
+        self,
+        interaction: discord.Interaction,
+        accepted: bool,
+        reason: str,
+        review_message: discord.Message | None,
+    ):
         if self.processed:
             await interaction.response.send_message("This application has already been processed.", ephemeral=True)
             return
@@ -201,8 +207,9 @@ class ApplicationReviewView(discord.ui.View):
         )
 
         # Update review message: remove raw ID field and show decision details.
-        if interaction.message and interaction.message.embeds:
-            original = interaction.message.embeds[0]
+        message_to_update = review_message
+        if message_to_update is not None and message_to_update.embeds:
+            original = message_to_update.embeds[0]
             updated = discord.Embed(
                 title=original.title,
                 description=original.description,
@@ -223,7 +230,7 @@ class ApplicationReviewView(discord.ui.View):
             updated.set_footer(text=original.footer.text if original.footer else None)
 
             await self.disable_buttons()
-            await interaction.message.edit(embed=updated, view=self)
+            await message_to_update.edit(embed=updated, view=self)
 
         await interaction.followup.send(
             f"Application {'accepted' if accepted else 'denied'}. Applicant has been notified.",
@@ -232,11 +239,11 @@ class ApplicationReviewView(discord.ui.View):
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, custom_id="app_accept")
     async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(ReviewReasonModal(self, accepted=True))
+        await interaction.response.send_modal(ReviewReasonModal(self, accepted=True, review_message=interaction.message))
 
     @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="app_deny")
     async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(ReviewReasonModal(self, accepted=False))
+        await interaction.response.send_modal(ReviewReasonModal(self, accepted=False, review_message=interaction.message))
 
 
 class ReviewReasonModal(discord.ui.Modal, title="Application Review Reason"):
@@ -248,16 +255,18 @@ class ReviewReasonModal(discord.ui.Modal, title="Application Review Reason"):
         placeholder="Enter the reason sent to the applicant and logs.",
     )
 
-    def __init__(self, review_view: ApplicationReviewView, accepted: bool):
+    def __init__(self, review_view: ApplicationReviewView, accepted: bool, review_message: discord.Message | None):
         super().__init__()
         self.review_view = review_view
         self.accepted = accepted
+        self.review_message = review_message
 
     async def on_submit(self, interaction: discord.Interaction):
         await self.review_view.handle_decision(
             interaction,
             accepted=self.accepted,
             reason=self.reason.value.strip(),
+            review_message=self.review_message,
         )
 
 
