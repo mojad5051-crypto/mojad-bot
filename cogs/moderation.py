@@ -359,8 +359,6 @@ class ModerationCog(commands.Cog):
     async def _refresh_ssu_panels_once(self) -> None:
         if not self._ssu_panels:
             return
-        stats, api_ok = await self._fetch_ssu_stats()
-        embed = self._build_ssu_embed(stats=stats, api_ok=api_ok)
         stale_message_ids: list[int] = []
         for message_id, (guild_id, channel_id) in list(self._ssu_panels.items()):
             guild = self.bot.get_guild(guild_id)
@@ -372,6 +370,19 @@ class ModerationCog(commands.Cog):
                 stale_message_ids.append(message_id)
                 continue
             try:
+                stats, api_ok = await self._fetch_ssu_stats()
+
+                # Staff Online should come from Melonly on-shift role (if configured).
+                config = get_bot_config(self.bot)
+                shift_role_id = int(config.get("ssu_staff_online_role_id", 0) or 0)
+                if shift_role_id:
+                    role = guild.get_role(shift_role_id)
+                    if role is not None:
+                        # Count members with the on-shift role.
+                        staff_online = sum(1 for m in guild.members if role in m.roles)
+                        stats["staff"] = str(staff_online)
+
+                embed = self._build_ssu_embed(stats=stats, api_ok=api_ok)
                 message = await channel.fetch_message(message_id)
                 await message.edit(embed=embed, view=SSUPanelView(self.bot))
             except Exception:

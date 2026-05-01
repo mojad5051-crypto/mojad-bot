@@ -374,6 +374,7 @@ class FloridaRPBot(commands.Bot):
             "ssu_api_key": os.getenv("SSU_API_KEY", ""),
             "ssu_api_url": os.getenv("SSU_API_URL", ""),
             "ssu_api_mode": os.getenv("SSU_API_MODE", "auto"),  # auto | prc | push
+            "ssu_staff_online_role_id": int(os.getenv("SSU_STAFF_ONLINE_ROLE_ID", "1496970691877277757") or "1496970691877277757"),
             "ssu_server_name": os.getenv("SSU_SERVER_NAME", "Florida Sessions Roleplay"),
             "ssu_server_owner": os.getenv("SSU_SERVER_OWNER", "<@1311973437924966462>"),
             "ssu_server_code": os.getenv("SSU_SERVER_CODE", "FLSRPSAP"),
