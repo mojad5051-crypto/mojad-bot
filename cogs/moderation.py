@@ -3,6 +3,10 @@ from discord import app_commands
 from discord.ext import commands
 
 
+def get_bot_config(bot: commands.Bot) -> dict:
+    return getattr(bot, "config", {})
+
+
 class VoidReasonModal(discord.ui.Modal, title="Void Infraction"):
     """Modal for admins to void an infraction"""
     void_reason = discord.ui.TextInput(
@@ -70,7 +74,8 @@ class VoidButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         """Handle void button click - admin only"""
         # Check if user is admin
-        has_admin_role = any(role.id == self.bot.config["staff_role_id"] for role in interaction.user.roles)
+        bot_config = get_bot_config(self.bot)
+        has_admin_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.manage_guild or has_admin_role):
             await interaction.response.send_message("❌ Only administrators can void infractions.", ephemeral=True)
             return
@@ -126,7 +131,8 @@ class ModerationCog(commands.Cog):
     ) -> None:
         """Issue an infraction to a user"""
         # Check permissions
-        has_role = any(role.id == self.bot.config["staff_role_id"] for role in interaction.user.roles)
+        bot_config = get_bot_config(self.bot)
+        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.manage_guild or has_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
@@ -163,14 +169,16 @@ class ModerationCog(commands.Cog):
         embed.add_field(name="🔔 Appeal Status", value=f"`{appeal_status}`", inline=False)
         
         # Add moderator avatar
-        embed.set_author(name="Moderation Action", icon_url=self.bot.config.get("logo_url", interaction.user.display_avatar.url))
+        bot_config = get_bot_config(self.bot)
+        embed.set_author(name="Moderation Action", icon_url=bot_config.get("logo_url", interaction.user.display_avatar.url))
         
         # Timestamp and footer with accent color indicator
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text=f"Infraction ID: {infraction_id} • Glass UI", icon_url=interaction.guild.icon)
 
         # Send to log channel
-        infraction_channel = interaction.guild.get_channel(self.bot.config.get("infraction_log_channel_id") or self.bot.config["review_channel_id"])
+        bot_config = get_bot_config(self.bot)
+        infraction_channel = interaction.guild.get_channel(bot_config.get("infraction_log_channel_id") or bot_config.get("review_channel_id"))
         if infraction_channel is not None:
             # Create the view with the void button
             view = InfractionView(infraction_id, user.id, role, self.bot)
@@ -194,7 +202,8 @@ class ModerationCog(commands.Cog):
     @app_commands.describe(user="The user to promote", role="The new role to assign", reason="The reason for the promotion")
     async def promote_command(self, interaction: discord.Interaction, user: discord.Member, role: discord.Role, reason: str) -> None:
         # Check permissions
-        has_role = any(role.id == self.bot.config["staff_role_id"] for role in interaction.user.roles)
+        bot_config = get_bot_config(self.bot)
+        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.manage_guild or has_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
@@ -221,14 +230,15 @@ class ModerationCog(commands.Cog):
         embed.add_field(name="📝 Reason", value=f"*{reason}*", inline=False)
         
         # Add moderator avatar
-        embed.set_author(name=f"Promoted by {interaction.user.name}", icon_url=self.bot.config.get("logo_url", interaction.user.display_avatar.url))
+        bot_config = get_bot_config(self.bot)
+        embed.set_author(name=f"Promoted by {interaction.user.name}", icon_url=bot_config.get("logo_url", interaction.user.display_avatar.url))
         
         # Timestamp and footer with accent color indicator
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text="Promotion Logged • Glass UI", icon_url=interaction.guild.icon)
 
         # Send to log channel
-        promotion_channel = interaction.guild.get_channel(self.bot.config.get("promotion_log_channel_id") or self.bot.config["review_channel_id"])
+        promotion_channel = interaction.guild.get_channel(bot_config.get("promotion_log_channel_id") or bot_config.get("review_channel_id"))
         if promotion_channel is not None:
             await promotion_channel.send(embed=embed)
 
@@ -257,7 +267,8 @@ class ModerationCog(commands.Cog):
     ) -> None:
         """Send a custom embed with multiple fields"""
         # Check permissions
-        has_role = any(role.id == self.bot.config["staff_role_id"] for role in interaction.user.roles)
+        bot_config = get_bot_config(self.bot)
+        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.manage_guild or has_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
@@ -288,7 +299,8 @@ class ModerationCog(commands.Cog):
             description="Interested in becoming a moderator? Apply now!",
             color=0x6366f1  # Indigo color
         )
-        embed.set_thumbnail(url=self.bot.config.get("logo_url", ""))
+        bot_config = get_bot_config(self.bot)
+        embed.set_thumbnail(url=bot_config.get("logo_url", ""))
         embed.add_field(
             name="📝 Application Form",
             value="Click the button below to access the moderator application form.",

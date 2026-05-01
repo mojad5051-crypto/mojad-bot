@@ -226,8 +226,9 @@ class FloridaRPBot(commands.Bot):
         
         super().__init__(command_prefix="!", intents=intents)
         self.web_runner = None
+        self.config = {}
         self.db = Database(DATABASE_PATH)
-        self.config = {
+        self.config.update({
             "review_channel_id": REVIEW_CHANNEL_ID,
             "staff_role_id": STAFF_ROLE_ID,
             "infraction_log_channel_id": INFRACTION_LOG_CHANNEL_ID,
@@ -235,7 +236,7 @@ class FloridaRPBot(commands.Bot):
             "embed_color": EMBED_COLOR,
             "panel_banner_url": PANEL_BANNER_URL,
             "logo_url": LOGO_URL,
-        } # fix
+        })
     
     async def setup_hook(self):
         logger.info("Setting up bot")
