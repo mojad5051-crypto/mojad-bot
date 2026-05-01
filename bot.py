@@ -235,7 +235,7 @@ class FloridaRPBot(commands.Bot):
             "embed_color": EMBED_COLOR,
             "panel_banner_url": PANEL_BANNER_URL,
             "logo_url": LOGO_URL,
-        }
+        } # fix
     
     async def setup_hook(self):
         logger.info("Setting up bot")
