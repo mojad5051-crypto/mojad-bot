@@ -43,7 +43,7 @@ SUPPORT_OPTIONS = {
         "label": "Management Support",
         "description": "For sponsorships, transfers, advertisements, and high-priority matters",
         "rank": 3,
-        "roles": [1496970658557464586, 1496986660691513505],
+        "roles": [1496970658557464586],
     },
     "directive": {
         "label": "Directive Support",
