@@ -30,6 +30,7 @@ EMBED_COLOR = int(os.getenv("EMBED_COLOR", "1973790"))
 PANEL_BANNER_URL = os.getenv("PANEL_BANNER_URL", "https://imgur.com/WxeW12e")
 LOGO_URL = os.getenv("LOGO_URL", "https://imgur.com/WxeW12e")
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "data/database.db"))
+SYNC_COMMANDS_ON_START = os.getenv("SYNC_COMMANDS_ON_START", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 if not TOKEN or GUILD_ID == 0 or REVIEW_CHANNEL_ID == 0:
     logger.error(
@@ -251,13 +252,17 @@ class FloridaRPBot(commands.Bot):
             except Exception as e:
                 logger.warning(f"Could not load {cog_module}: {e}")
         
-        # Sync commands
-        guild = discord.Object(id=GUILD_ID)
-        self.tree.copy_global_to(guild=guild)
-        await self.tree.sync(guild=guild)
-        logger.info("Commands synced")
-        
+        # Start web server early so Railway health checks succeed quickly.
         await self.start_web_server()
+
+        # Sync commands only when explicitly enabled.
+        if SYNC_COMMANDS_ON_START:
+            guild = discord.Object(id=GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+            logger.info("Commands synced")
+        else:
+            logger.info("Skipping command sync on startup (SYNC_COMMANDS_ON_START=false)")
     
     async def on_ready(self):
         logger.info(f"Logged in as {self.user}")
