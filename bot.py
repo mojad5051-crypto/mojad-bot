@@ -118,6 +118,7 @@ def build_log_embed(
     role_assigned: bool,
     applicant_member: discord.Member | None,
     reason: str,
+    dm_status: str,
 ) -> discord.Embed:
     status = "Accepted" if accepted else "Denied"
     color = 0x2ECC71 if accepted else 0xE74C3C
@@ -132,6 +133,7 @@ def build_log_embed(
     embed.add_field(name="Decision", value=status, inline=True)
     embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
     embed.add_field(name="Role Granted", value="Yes" if role_assigned else "No", inline=True)
+    embed.add_field(name="DM Status", value=dm_status, inline=True)
     embed.add_field(name="Applicant in Guild", value="Yes" if applicant_member else "No", inline=True)
     embed.add_field(name="Submitted At", value=data.get("submittedAt", "N/A"), inline=False)
     return embed
@@ -196,7 +198,15 @@ class ApplicationReviewView(discord.ui.View):
             except Exception as e:
                 logger.warning(f"Failed to assign accepted role: {e}")
 
-        await send_applicant_dm(self.bot, application, accepted, reviewer, accepted_role_assigned, reason)
+        dm_status = await send_applicant_dm(
+            self.bot,
+            application,
+            accepted,
+            reviewer,
+            accepted_role_assigned,
+            reason,
+            applicant_member,
+        )
         await log_application_decision(
             self.bot,
             application,
@@ -205,6 +215,7 @@ class ApplicationReviewView(discord.ui.View):
             accepted_role_assigned,
             applicant_member,
             reason,
+            dm_status,
         )
 
         # Update review message: remove raw ID field and show decision details.
@@ -234,7 +245,10 @@ class ApplicationReviewView(discord.ui.View):
             await message_to_update.edit(embed=updated, view=self)
 
         await interaction.followup.send(
-            f"Application {'accepted' if accepted else 'denied'}. Applicant has been notified.",
+            (
+                f"Application {'accepted' if accepted else 'denied'}.\n"
+                f"DM status: {dm_status}"
+            ),
             ephemeral=True
         )
 
@@ -278,15 +292,27 @@ async def send_applicant_dm(
     reviewer: discord.Member,
     role_assigned: bool,
     reason: str,
-):
+    applicant_member: discord.Member | None,
+) -> str:
+    embed = build_decision_embed(data, accepted, reviewer, role_assigned, reason)
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+
     try:
-        user = await bot.fetch_user(int(str(data.get("discordUserId", "0")).strip() or 0))
-        if user is None:
-            return
-        embed = build_decision_embed(data, accepted, reviewer, role_assigned, reason)
+        if applicant_member is not None:
+            await applicant_member.send(embed=embed)
+            return "Sent"
+
+        if not applicant_id_raw.isdigit():
+            return "Not sent (invalid Discord User ID in application)"
+
+        user = await bot.fetch_user(int(applicant_id_raw))
         await user.send(embed=embed)
+        return "Sent"
+    except discord.Forbidden:
+        return "Failed (user has DMs closed)"
     except Exception as e:
         logger.warning(f"Failed to DM applicant: {e}")
+        return "Failed (unexpected error)"
 
 
 async def log_application_decision(
@@ -297,6 +323,7 @@ async def log_application_decision(
     role_assigned: bool,
     applicant_member: discord.Member | None,
     reason: str,
+    dm_status: str,
 ):
     channel = bot.get_channel(LOG_CHANNEL_ID)
     if channel is None:
@@ -306,7 +333,7 @@ async def log_application_decision(
             logger.warning(f"Failed to fetch log channel: {e}")
             return
 
-    embed = build_log_embed(data, accepted, reviewer, role_assigned, applicant_member, reason)
+    embed = build_log_embed(data, accepted, reviewer, role_assigned, applicant_member, reason, dm_status)
     await channel.send(embed=embed)
 
 
