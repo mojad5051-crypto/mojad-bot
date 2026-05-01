@@ -52,12 +52,16 @@ CORS_HEADERS = {
 
 
 def build_application_embed(data: dict) -> discord.Embed:
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+    applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "Unknown applicant ID"
+
     embed = discord.Embed(
         title="Moderator Application",
         description="A new moderator application has been submitted.",
         color=0x1E90FF,
         timestamp=discord.utils.utcnow()
     )
+    embed.add_field(name="Applicant", value=applicant_mention, inline=True)
     embed.add_field(name="Roblox Username", value=data.get("robloxUsername", "N/A"), inline=True)
     embed.add_field(name="Discord Username", value=data.get("discordUsername", "N/A"), inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
