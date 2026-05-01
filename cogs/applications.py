@@ -82,5 +82,5 @@ class ApplicationCog(commands.Cog):
         await interaction.response.send_modal(VerifyRobloxModal(self.bot))
 
 
-def setup(bot: commands.Bot) -> None:
-    bot.add_cog(ApplicationCog(bot))
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(ApplicationCog(bot))
