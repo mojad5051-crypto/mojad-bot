@@ -89,6 +89,9 @@ def build_decision_embed(
     role_assigned: bool,
     reason: str,
 ) -> discord.Embed:
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+    applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "Unknown applicant ID"
+
     if accepted:
         title = "Moderator Application Approved"
         description = (
@@ -105,7 +108,7 @@ def build_decision_embed(
         color = 0xE74C3C
 
     embed = discord.Embed(title=title, description=description, color=color, timestamp=discord.utils.utcnow())
-    embed.add_field(name="Applicant", value=data.get("discordUsername", "N/A"), inline=True)
+    embed.add_field(name="Applicant", value=applicant_mention, inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
     embed.add_field(name="Reviewed By", value=reviewer.display_name, inline=True)
     embed.add_field(name="Decision", value="Accepted" if accepted else "Denied", inline=True)
@@ -124,6 +127,9 @@ def build_log_embed(
     reason: str,
     dm_status: str,
 ) -> discord.Embed:
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+    applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "Unknown applicant ID"
+
     status = "Accepted" if accepted else "Denied"
     color = 0x2ECC71 if accepted else 0xE74C3C
     embed = discord.Embed(
@@ -132,7 +138,7 @@ def build_log_embed(
         color=color,
         timestamp=discord.utils.utcnow()
     )
-    embed.add_field(name="Applicant", value=data.get("discordUsername", "N/A"), inline=True)
+    embed.add_field(name="Applicant", value=applicant_mention, inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
     embed.add_field(name="Decision", value=status, inline=True)
     embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
