@@ -2,6 +2,10 @@ import discord
 from discord.ext import commands
 
 
+def get_bot_config(bot: commands.Bot) -> dict:
+    return getattr(bot, "config", {})
+
+
 class ApplicationModal(discord.ui.Modal, title="Staff Application"):
     age = discord.ui.TextInput(label="Age", placeholder="Your age", required=True)
     experience = discord.ui.TextInput(label="Experience", style=discord.TextStyle.paragraph, placeholder="Your past roleplay or staff experience", required=True)
@@ -33,7 +37,8 @@ class ApplicationModal(discord.ui.Modal, title="Staff Application"):
         embed.add_field(name="Motivation", value=self.motivation.value, inline=False)
         embed.set_footer(text=f"Application ID: {application_id}")
 
-        review_channel = interaction.guild.get_channel(self.bot.config["review_channel_id"]) if interaction.guild else None
+        bot_config = get_bot_config(self.bot)
+        review_channel = interaction.guild.get_channel(bot_config.get("review_channel_id")) if interaction.guild else None
         if review_channel is not None:
             await review_channel.send(embed=embed)
 
@@ -64,7 +69,8 @@ class VerifyRobloxModal(discord.ui.Modal, title="Verify Roblox Username"):
         )
         embed.set_footer(text="Stored for persistent identity tracking.")
 
-        review_channel = interaction.guild.get_channel(self.bot.config["review_channel_id"])
+        bot_config = get_bot_config(self.bot)
+        review_channel = interaction.guild.get_channel(bot_config.get("review_channel_id"))
         if review_channel is not None:
             await review_channel.send(embed=embed)
 
