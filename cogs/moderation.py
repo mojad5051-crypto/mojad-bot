@@ -178,7 +178,23 @@ class ModerationCog(commands.Cog):
         config = get_bot_config(self.bot)
         api_url = str(config.get("ssu_api_url", "") or "").strip()
         api_key = str(config.get("ssu_api_key", "") or "").strip()
-        if not api_url or not api_key:
+        if not api_key:
+            return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+
+        # Preferred: if no URL is configured, use pushed in-game stats from /ssu/stats.
+        if not api_url:
+            latest = getattr(self.bot, "ssu_latest_stats", {}) or {}
+            last_update_ts = int(getattr(self.bot, "ssu_last_update_ts", 0) or 0)
+            if latest and last_update_ts > 0 and (int(time.time()) - last_update_ts) <= 180:
+                stats = {
+                    "status": str(latest.get("status", "Online")),
+                    "players": str(latest.get("players", "N/A")),
+                    "staff": str(latest.get("staff", "N/A")),
+                    "queue": str(latest.get("queue", "N/A")),
+                    "server_name": str(latest.get("server_name", config.get("ssu_server_name", "Florida Sessions Roleplay"))),
+                    "server_code": str(latest.get("server_code", config.get("ssu_server_code", "N/A"))),
+                }
+                return stats, True
             return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
 
         try:

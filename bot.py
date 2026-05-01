@@ -2,6 +2,7 @@
 import os
 import sys
 import logging
+import time
 from pathlib import Path
 
 import discord
@@ -359,6 +360,8 @@ class FloridaRPBot(commands.Bot):
         self.web_runner = None
         self._commands_synced = False
         self.config = {}
+        self.ssu_latest_stats: dict = {}
+        self.ssu_last_update_ts: int = 0
         self.db = Database(DATABASE_PATH)
         self.config.update({
             "review_channel_id": REVIEW_CHANNEL_ID,
@@ -456,6 +459,39 @@ class FloridaRPBot(commands.Bot):
                 logger.exception("Error handling application")
                 return web.json_response({"success": False, "error": str(e)}, status=500, headers=CORS_HEADERS)
         
+        async def handle_ssu_stats(request: web.Request):
+            try:
+                config = self.config
+                expected_key = str(config.get("ssu_api_key", "") or "").strip()
+                if not expected_key:
+                    return web.json_response({"success": False, "error": "SSU API key not configured"}, status=503, headers=CORS_HEADERS)
+
+                provided_key = (
+                    request.headers.get("x-api-key")
+                    or request.headers.get("X-API-Key")
+                    or request.headers.get("authorization", "").replace("Bearer ", "").strip()
+                )
+                if provided_key != expected_key:
+                    return web.json_response({"success": False, "error": "Unauthorized"}, status=401, headers=CORS_HEADERS)
+
+                data = await request.json()
+                if not isinstance(data, dict):
+                    return web.json_response({"success": False, "error": "Invalid JSON body"}, status=400, headers=CORS_HEADERS)
+
+                self.ssu_latest_stats = {
+                    "players": data.get("playerCount", data.get("players", "N/A")),
+                    "staff": data.get("staffOnline", data.get("staff", "N/A")),
+                    "queue": data.get("queueCount", data.get("queue", "N/A")),
+                    "status": data.get("serverStatus", data.get("status", "Online")),
+                    "server_name": data.get("serverName", config.get("ssu_server_name", "Florida Sessions Roleplay")),
+                    "server_code": data.get("serverCode", config.get("ssu_server_code", "N/A")),
+                }
+                self.ssu_last_update_ts = int(time.time())
+                return web.json_response({"success": True}, headers=CORS_HEADERS)
+            except Exception as exc:
+                logger.exception("Failed to ingest SSU stats: %s", exc)
+                return web.json_response({"success": False, "error": "Failed to ingest stats"}, status=500, headers=CORS_HEADERS)
+
         async def handle_options(request):
             return web.Response(status=204, headers=CORS_HEADERS)
         
@@ -465,6 +501,8 @@ class FloridaRPBot(commands.Bot):
             app.router.add_get("/health", handle_health)
             app.router.add_post("/apply", handle_apply)
             app.router.add_options("/apply", handle_options)
+            app.router.add_post("/ssu/stats", handle_ssu_stats)
+            app.router.add_options("/ssu/stats", handle_options)
             
             self.web_runner = web.AppRunner(app)
             await self.web_runner.setup()
