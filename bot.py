@@ -19,12 +19,12 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID", "0"))
-REVIEW_CHANNEL_ID = int(os.getenv("REVIEW_CHANNEL_ID", "0"))
-STAFF_ROLE_ID = int(os.getenv("STAFF_ROLE_ID", "0"))
+REVIEW_CHANNEL_ID = int(os.getenv("REVIEW_CHANNEL_ID", "1497630261607792792"))
+STAFF_ROLE_ID = int(os.getenv("STAFF_ROLE_ID", "1496970697430536489"))
 INFRACTION_LOG_CHANNEL_ID = int(os.getenv("INFRACTION_LOG_CHANNEL_ID", str(REVIEW_CHANNEL_ID)))
 PROMOTION_LOG_CHANNEL_ID = int(os.getenv("PROMOTION_LOG_CHANNEL_ID", str(REVIEW_CHANNEL_ID)))
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", str(PROMOTION_LOG_CHANNEL_ID or INFRACTION_LOG_CHANNEL_ID or REVIEW_CHANNEL_ID)))
-ACCEPT_ROLE_ID = int(os.getenv("ACCEPT_ROLE_ID", "0"))
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "1497628703381917827"))
+ACCEPT_ROLE_ID = int(os.getenv("ACCEPT_ROLE_ID", "1496970734919094303"))
 PORT = int(os.getenv("PORT", "8080"))
 EMBED_COLOR = int(os.getenv("EMBED_COLOR", "1973790"))
 PANEL_BANNER_URL = os.getenv("PANEL_BANNER_URL", "https://imgur.com/WxeW12e")
@@ -79,26 +79,27 @@ def build_application_embed(data: dict) -> discord.Embed:
 
 def build_decision_embed(data: dict, accepted: bool, reviewer: discord.Member, role_assigned: bool) -> discord.Embed:
     if accepted:
-        title = "Application Accepted"
+        title = "Moderator Application Approved"
         description = (
-            "Congratulations! Your moderator application has been accepted. "
-            "Please check your Discord DMs for next steps."
+            "Your application has been reviewed and approved by our staff team. "
+            "A moderator role has been assigned, and you may now begin assisting with enforcement duties."
         )
         color = 0x2ECC71
     else:
-        title = "Application Denied"
+        title = "Moderator Application Declined"
         description = (
-            "Thank you for applying. After review, your application was not accepted at this time. "
-            "Please review the rules and consider reapplying later."
+            "Thank you for your application. After careful review, your application was not accepted at this time. "
+            "Please continue to participate positively in the community and feel free to reapply later."
         )
         color = 0xE74C3C
 
     embed = discord.Embed(title=title, description=description, color=color, timestamp=discord.utils.utcnow())
     embed.add_field(name="Applicant", value=data.get("discordUsername", "N/A"), inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
-    embed.add_field(name="Reviewer", value=reviewer.display_name, inline=True)
-    embed.add_field(name="Decision", value="Accepted" if accepted else "Denied", inline=True)
+    embed.add_field(name="Reviewed By", value=reviewer.display_name, inline=True)
+    embed.add_field(name="Review Outcome", value="Accepted" if accepted else "Denied", inline=True)
     embed.add_field(name="Role Granted", value="Yes" if role_assigned else "No", inline=False)
+    embed.set_footer(text="Florida State Roleplay Staff Review")
     return embed
 
 
@@ -285,11 +286,14 @@ class FloridaRPBot(commands.Bot):
                 embed = build_application_embed(data)
                 view = ApplicationReviewView(self, data)
                 await channel.send(
-                    content=f"<@&{STAFF_ROLE_ID}> A new moderator application has been submitted.",
+                    content=(
+                        f"<@&{STAFF_ROLE_ID}> A new moderator application has been submitted for review. "
+                        "Please use the buttons below to Accept or Deny the application."
+                    ),
                     embed=embed,
                     view=view
                 )
-                logger.info("Application sent to Discord")
+                logger.info("Application sent to Discord review channel")
 
                 return web.json_response({"success": True}, headers=CORS_HEADERS)
             except Exception as e:
