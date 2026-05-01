@@ -2,6 +2,7 @@
 import os
 import sys
 import logging
+import time
 from pathlib import Path
 
 import discord
@@ -52,12 +53,16 @@ CORS_HEADERS = {
 
 
 def build_application_embed(data: dict) -> discord.Embed:
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+    applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "Unknown applicant ID"
+
     embed = discord.Embed(
         title="Moderator Application",
         description="A new moderator application has been submitted.",
         color=0x1E90FF,
         timestamp=discord.utils.utcnow()
     )
+    embed.add_field(name="Applicant", value=applicant_mention, inline=True)
     embed.add_field(name="Roblox Username", value=data.get("robloxUsername", "N/A"), inline=True)
     embed.add_field(name="Discord Username", value=data.get("discordUsername", "N/A"), inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
@@ -85,28 +90,32 @@ def build_decision_embed(
     role_assigned: bool,
     reason: str,
 ) -> discord.Embed:
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+    applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "Unknown applicant ID"
+
     if accepted:
-        title = "Application Accepted"
+        title = "Moderator Application Approved"
         description = (
-            "Congratulations! Your moderator application has been accepted. "
-            "Please check your Discord DMs for next steps."
+            "Your application has been reviewed and approved by our staff team. "
+            "A moderator role has been assigned, and you may now begin assisting with enforcement duties."
         )
         color = 0x2ECC71
     else:
-        title = "Application Denied"
+        title = "Moderator Application Declined"
         description = (
-            "Thank you for applying. After review, your application was not accepted at this time. "
-            "Please review the rules and consider reapplying later."
+            "Thank you for your application. After careful review, your application was not accepted at this time. "
+            "Please continue to participate positively in the community and feel free to reapply later."
         )
         color = 0xE74C3C
 
     embed = discord.Embed(title=title, description=description, color=color, timestamp=discord.utils.utcnow())
-    embed.add_field(name="Applicant", value=data.get("discordUsername", "N/A"), inline=True)
+    embed.add_field(name="Applicant", value=applicant_mention, inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
-    embed.add_field(name="Reviewer", value=reviewer.display_name, inline=True)
+    embed.add_field(name="Reviewed By", value=reviewer.display_name, inline=True)
     embed.add_field(name="Decision", value="Accepted" if accepted else "Denied", inline=True)
     embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
     embed.add_field(name="Role Granted", value="Yes" if role_assigned else "No", inline=False)
+    embed.set_footer(text="Florida State Roleplay Staff Review")
     return embed
 
 
@@ -117,7 +126,11 @@ def build_log_embed(
     role_assigned: bool,
     applicant_member: discord.Member | None,
     reason: str,
+    dm_status: str,
 ) -> discord.Embed:
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+    applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "Unknown applicant ID"
+
     status = "Accepted" if accepted else "Denied"
     color = 0x2ECC71 if accepted else 0xE74C3C
     embed = discord.Embed(
@@ -126,11 +139,12 @@ def build_log_embed(
         color=color,
         timestamp=discord.utils.utcnow()
     )
-    embed.add_field(name="Applicant", value=data.get("discordUsername", "N/A"), inline=True)
+    embed.add_field(name="Applicant", value=applicant_mention, inline=True)
     embed.add_field(name="Discord ID", value=data.get("discordUserId", "N/A"), inline=True)
     embed.add_field(name="Decision", value=status, inline=True)
     embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
     embed.add_field(name="Role Granted", value="Yes" if role_assigned else "No", inline=True)
+    embed.add_field(name="DM Status", value=dm_status, inline=True)
     embed.add_field(name="Applicant in Guild", value="Yes" if applicant_member else "No", inline=True)
     embed.add_field(name="Submitted At", value=data.get("submittedAt", "N/A"), inline=False)
     return embed
@@ -195,7 +209,15 @@ class ApplicationReviewView(discord.ui.View):
             except Exception as e:
                 logger.warning(f"Failed to assign accepted role: {e}")
 
-        await send_applicant_dm(self.bot, application, accepted, reviewer, accepted_role_assigned, reason)
+        dm_status = await send_applicant_dm(
+            self.bot,
+            application,
+            accepted,
+            reviewer,
+            accepted_role_assigned,
+            reason,
+            applicant_member,
+        )
         await log_application_decision(
             self.bot,
             application,
@@ -204,6 +226,7 @@ class ApplicationReviewView(discord.ui.View):
             accepted_role_assigned,
             applicant_member,
             reason,
+            dm_status,
         )
 
         # Update review message: remove raw ID field and show decision details.
@@ -233,7 +256,10 @@ class ApplicationReviewView(discord.ui.View):
             await message_to_update.edit(embed=updated, view=self)
 
         await interaction.followup.send(
-            f"Application {'accepted' if accepted else 'denied'}. Applicant has been notified.",
+            (
+                f"Application {'accepted' if accepted else 'denied'}.\n"
+                f"DM status: {dm_status}"
+            ),
             ephemeral=True
         )
 
@@ -277,15 +303,30 @@ async def send_applicant_dm(
     reviewer: discord.Member,
     role_assigned: bool,
     reason: str,
-):
+    applicant_member: discord.Member | None,
+) -> str:
+    embed = build_decision_embed(data, accepted, reviewer, role_assigned, reason)
+    applicant_id_raw = str(data.get("discordUserId", "")).strip()
+
     try:
-        user = await bot.fetch_user(int(str(data.get("discordUserId", "0")).strip() or 0))
+        if applicant_member is not None:
+            await applicant_member.send(embed=embed)
+            return "Sent"
+
+        if not applicant_id_raw.isdigit():
+            return "Not sent (invalid Discord User ID in application)"
+
+        user = await bot.fetch_user(int(applicant_id_raw))
         if user is None:
-            return
-        embed = build_decision_embed(data, accepted, reviewer, role_assigned, reason)
+            return "Not sent (user not found)"
+
         await user.send(embed=embed)
+        return "Sent"
+    except discord.Forbidden:
+        return "Failed (user has DMs closed)"
     except Exception as e:
         logger.warning(f"Failed to DM applicant: {e}")
+        return "Failed (unexpected error)"
 
 
 async def log_application_decision(
@@ -296,6 +337,7 @@ async def log_application_decision(
     role_assigned: bool,
     applicant_member: discord.Member | None,
     reason: str,
+    dm_status: str,
 ):
     channel = bot.get_channel(LOG_CHANNEL_ID)
     if channel is None:
@@ -305,7 +347,7 @@ async def log_application_decision(
             logger.warning(f"Failed to fetch log channel: {e}")
             return
 
-    embed = build_log_embed(data, accepted, reviewer, role_assigned, applicant_member, reason)
+    embed = build_log_embed(data, accepted, reviewer, role_assigned, applicant_member, reason, dm_status)
     await channel.send(embed=embed)
 
 
@@ -319,8 +361,12 @@ class FloridaRPBot(commands.Bot):
         
         super().__init__(command_prefix="!", intents=intents)
         self.web_runner = None
+        self._commands_synced = False
+        self.config = {}
+        self.ssu_latest_stats: dict = {}
+        self.ssu_last_update_ts: int = 0
         self.db = Database(DATABASE_PATH)
-        self.config = {
+        self.config.update({
             "review_channel_id": REVIEW_CHANNEL_ID,
             "staff_role_id": STAFF_ROLE_ID,
             "infraction_log_channel_id": INFRACTION_LOG_CHANNEL_ID,
@@ -328,13 +374,23 @@ class FloridaRPBot(commands.Bot):
             "embed_color": EMBED_COLOR,
             "panel_banner_url": PANEL_BANNER_URL,
             "logo_url": LOGO_URL,
-        } # fix
+            "ssu_api_key": os.getenv("SSU_API_KEY", ""),
+            "ssu_api_url": os.getenv("SSU_API_URL", ""),
+            "ssu_api_mode": os.getenv("SSU_API_MODE", "auto"),  # auto | prc | push
+            "ssu_staff_online_role_id": int(os.getenv("SSU_STAFF_ONLINE_ROLE_ID", "1496970691877277757") or "1496970691877277757"),
+            "ssu_server_name": os.getenv("SSU_SERVER_NAME", "Florida Sessions Roleplay"),
+            "ssu_server_owner": os.getenv("SSU_SERVER_OWNER", "<@1311973437924966462>"),
+            "ssu_server_code": os.getenv("SSU_SERVER_CODE", "FLSRPSAP"),
+            "session_role_id": int(os.getenv("SESSION_ROLE_ID", "1497021079842193558") or "1497021079842193558"),
+            "server_online_url": os.getenv("SERVER_ONLINE_URL", ""),
+        })
+        self.ssu_session_state = "Shutdown"
     
     async def setup_hook(self):
         logger.info("Setting up bot")
         
         # Load cogs
-        cogs = ["cogs.moderation", "cogs.applications", "cogs.training"]
+        cogs = ["cogs.moderation", "cogs.applications", "cogs.training", "cogs.assistance"]
         for cog_module in cogs:
             try:
                 await self.load_extension(cog_module)
@@ -356,6 +412,18 @@ class FloridaRPBot(commands.Bot):
     
     async def on_ready(self):
         logger.info(f"Logged in as {self.user}")
+        if not self._commands_synced:
+            self._commands_synced = True
+            self.loop.create_task(self._sync_commands_background())
+
+    async def _sync_commands_background(self) -> None:
+        try:
+            guild = discord.Object(id=GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+            logger.info("Background command sync completed")
+        except Exception as exc:
+            logger.warning(f"Background command sync failed: {exc}")
     
     async def start_web_server(self):
         async def handle_root(request):
@@ -380,18 +448,56 @@ class FloridaRPBot(commands.Bot):
 
                 embed = build_application_embed(data)
                 view = ApplicationReviewView(self, data)
+                applicant_id_raw = str(data.get("discordUserId", "")).strip()
+                applicant_mention = f"<@{applicant_id_raw}>" if applicant_id_raw.isdigit() else "`Unknown applicant ID`"
                 await channel.send(
-                    content=f"<@&{STAFF_ROLE_ID}> <@{data.get('discordUserId', '')}> A new moderator application has been submitted.",
+                    content=(
+                        f"<@&{STAFF_ROLE_ID}> {applicant_mention} A new moderator application has been submitted for review. "
+                        "Please use the buttons below to Accept or Deny the application."
+                    ),
                     embed=embed,
                     view=view
                 )
-                logger.info("Application sent to Discord")
+                logger.info("Application sent to Discord review channel")
 
                 return web.json_response({"success": True}, headers=CORS_HEADERS)
             except Exception as e:
                 logger.exception("Error handling application")
                 return web.json_response({"success": False, "error": str(e)}, status=500, headers=CORS_HEADERS)
         
+        async def handle_ssu_stats(request: web.Request):
+            try:
+                config = self.config
+                expected_key = str(config.get("ssu_api_key", "") or "").strip()
+                if not expected_key:
+                    return web.json_response({"success": False, "error": "SSU API key not configured"}, status=503, headers=CORS_HEADERS)
+
+                provided_key = (
+                    request.headers.get("x-api-key")
+                    or request.headers.get("X-API-Key")
+                    or request.headers.get("authorization", "").replace("Bearer ", "").strip()
+                )
+                if provided_key != expected_key:
+                    return web.json_response({"success": False, "error": "Unauthorized"}, status=401, headers=CORS_HEADERS)
+
+                data = await request.json()
+                if not isinstance(data, dict):
+                    return web.json_response({"success": False, "error": "Invalid JSON body"}, status=400, headers=CORS_HEADERS)
+
+                self.ssu_latest_stats = {
+                    "players": data.get("playerCount", data.get("players", "N/A")),
+                    "staff": data.get("staffOnline", data.get("staff", "N/A")),
+                    "queue": data.get("queueCount", data.get("queue", "N/A")),
+                    "status": data.get("serverStatus", data.get("status", "Online")),
+                    "server_name": data.get("serverName", config.get("ssu_server_name", "Florida Sessions Roleplay")),
+                    "server_code": data.get("serverCode", config.get("ssu_server_code", "N/A")),
+                }
+                self.ssu_last_update_ts = int(time.time())
+                return web.json_response({"success": True}, headers=CORS_HEADERS)
+            except Exception as exc:
+                logger.exception("Failed to ingest SSU stats: %s", exc)
+                return web.json_response({"success": False, "error": "Failed to ingest stats"}, status=500, headers=CORS_HEADERS)
+
         async def handle_options(request):
             return web.Response(status=204, headers=CORS_HEADERS)
         
@@ -401,6 +507,8 @@ class FloridaRPBot(commands.Bot):
             app.router.add_get("/health", handle_health)
             app.router.add_post("/apply", handle_apply)
             app.router.add_options("/apply", handle_options)
+            app.router.add_post("/ssu/stats", handle_ssu_stats)
+            app.router.add_options("/ssu/stats", handle_options)
             
             self.web_runner = web.AppRunner(app)
             await self.web_runner.setup()

@@ -3,6 +3,10 @@ from discord import app_commands
 from discord.ext import commands
 
 
+def get_bot_config(bot: commands.Bot) -> dict:
+    return getattr(bot, "config", {})
+
+
 def has_role_id(member: discord.Member, role_id: int) -> bool:
     role = member.guild.get_role(role_id)
     return role is not None and role in member.roles
@@ -77,7 +81,8 @@ class TrainingCog(commands.Cog):
 
     def check_training_team(self, interaction: discord.Interaction) -> bool:
         """Check if user has training team role or is admin"""
-        has_role = any(role.id == self.bot.config["staff_role_id"] for role in interaction.user.roles)
+        bot_config = get_bot_config(self.bot)
+        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
         return interaction.user.guild_permissions.manage_guild or has_role
 
     @app_commands.command(name="request-training", description="Request a training session (Staff Trainees)")
@@ -114,7 +119,8 @@ class TrainingCog(commands.Cog):
         embed.add_field(name="👤 Trainee Name", value=f"`{interaction.user.name}`", inline=False)
         
         # Add footer
-        embed.set_author(name="Training Request System", icon_url=self.bot.config.get("logo_url", ""))
+        bot_config = get_bot_config(self.bot)
+        embed.set_author(name="Training Request System", icon_url=bot_config.get("logo_url", ""))
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text="Training Team • Glass UI", icon_url=interaction.guild.icon)
 
@@ -249,7 +255,8 @@ class TrainingCog(commands.Cog):
                 await trainee.remove_roles(training_remove_role, reason="Training result processed")
 
         # Add footer
-        embed.set_author(name="Training System", icon_url=self.bot.config.get("logo_url", ""))
+        bot_config = get_bot_config(self.bot)
+        embed.set_author(name="Training System", icon_url=bot_config.get("logo_url", ""))
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text="Training Team • Glass UI", icon_url=interaction.guild.icon)
 
