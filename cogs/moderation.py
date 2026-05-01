@@ -363,11 +363,9 @@ class ModerationCog(commands.Cog):
         for message_id, (guild_id, channel_id) in list(self._ssu_panels.items()):
             guild = self.bot.get_guild(guild_id)
             if guild is None:
-                stale_message_ids.append(message_id)
                 continue
             channel = guild.get_channel(channel_id)
             if channel is None or not isinstance(channel, discord.TextChannel):
-                stale_message_ids.append(message_id)
                 continue
             try:
                 stats, api_ok = await self._fetch_ssu_stats()
@@ -385,14 +383,38 @@ class ModerationCog(commands.Cog):
                 embed = self._build_ssu_embed(stats=stats, api_ok=api_ok)
                 message = await channel.fetch_message(message_id)
                 await message.edit(embed=embed, view=SSUPanelView(self.bot))
-            except Exception:
+            except discord.NotFound:
+                # Message deleted -> remove from refresh list
                 stale_message_ids.append(message_id)
+            except discord.Forbidden:
+                # Missing permissions -> remove from refresh list
+                stale_message_ids.append(message_id)
+            except Exception as exc:
+                # Transient failure (rate limit, network hiccup, API glitch).
+                # Keep the panel and retry on next tick.
+                try:
+                    logger.warning(f"SSU refresh transient failure for message {message_id}: {exc}")
+                except Exception:
+                    pass
         for message_id in stale_message_ids:
             self._ssu_panels.pop(message_id, None)
 
     @tasks.loop(seconds=30)
     async def ssu_refresh_loop(self) -> None:
         await self._refresh_ssu_panels_once()
+
+    @ssu_refresh_loop.error
+    async def ssu_refresh_loop_error(self, error: Exception) -> None:
+        # Ensure the loop doesn't die permanently on an unexpected exception.
+        try:
+            logger.exception("SSU refresh loop crashed: %s", error)
+        except Exception:
+            pass
+        try:
+            if not self.ssu_refresh_loop.is_running():
+                self.ssu_refresh_loop.start()
+        except Exception:
+            pass
 
     @ssu_refresh_loop.before_loop
     async def before_ssu_refresh_loop(self) -> None:
