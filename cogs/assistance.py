@@ -32,28 +32,28 @@ SUPPORT_OPTIONS = {
         "description": "For questions, help, or general assistance",
         "rank": 1,
         "roles": [1496986660691513505, 1496970679558606848],
-        "channel_id": 1496970889613541608,
+        "channel_id": 1499770596622340157,
     },
     "internal": {
         "label": "Internal Affairs Support",
         "description": "For reporting staff members or internal issues",
         "rank": 2,
         "roles": [1496970664790196344, 1496986660691513505],
-        "channel_id": 1496970888027836707,
+        "channel_id": 1499844111996555404,
     },
     "management": {
         "label": "Management Support",
         "description": "For sponsorships, transfers, advertisements, and high-priority matters",
         "rank": 3,
         "roles": [1496970658557464586],
-        "channel_id": 1496970890695409744,
+        "channel_id": 1499844483221557308,
     },
     "directive": {
         "label": "Directive Support",
         "description": "For extremely critical issues requiring top-level handling",
         "rank": 4,
         "roles": [1496970649527255110],
-        "channel_id": 1499787286274113669,
+        "channel_id": 1499844652558455025,
     },
 }
 
