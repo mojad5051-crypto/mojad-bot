@@ -32,24 +32,28 @@ SUPPORT_OPTIONS = {
         "description": "For questions, help, or general assistance",
         "rank": 1,
         "roles": [1496986660691513505, 1496970679558606848],
+        "channel_id": 1496970889613541608,
     },
     "internal": {
         "label": "Internal Affairs Support",
         "description": "For reporting staff members or internal issues",
         "rank": 2,
         "roles": [1496970664790196344, 1496986660691513505],
+        "channel_id": 1496970888027836707,
     },
     "management": {
         "label": "Management Support",
         "description": "For sponsorships, transfers, advertisements, and high-priority matters",
         "rank": 3,
         "roles": [1496970658557464586],
+        "channel_id": 1496970890695409744,
     },
     "directive": {
         "label": "Directive Support",
         "description": "For extremely critical issues requiring top-level handling",
         "rank": 4,
         "roles": [1496970649527255110],
+        "channel_id": 1499787286274113669,
     },
 }
 
@@ -257,7 +261,7 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
 
         ticket_name = f"🔴-{sanitize_name(interaction.user.name, fallback='user')}-assistance"
         category = interaction.channel.category if interaction.channel is not None else None
-        anchor_channel = interaction.guild.get_channel(TICKET_TARGET_CHANNEL_ID)
+        anchor_channel = interaction.guild.get_channel(option.get("channel_id") or TICKET_TARGET_CHANNEL_ID)
         if anchor_channel is not None:
             if isinstance(anchor_channel, discord.CategoryChannel):
                 category = anchor_channel
