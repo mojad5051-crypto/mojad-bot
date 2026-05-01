@@ -180,11 +180,14 @@ class ModerationCog(commands.Cog):
         config = get_bot_config(self.bot)
         api_url = str(config.get("ssu_api_url", "") or "").strip()
         api_key = str(config.get("ssu_api_key", "") or "").strip()
+        api_mode = str(config.get("ssu_api_mode", "auto") or "auto").strip().lower()
         if not api_key:
             return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
 
-        # Preferred: if no URL is configured, use pushed in-game stats from /ssu/stats.
-        if not api_url:
+        def _offline():
+            return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+
+        async def _try_push_cache() -> tuple[dict, bool]:
             latest = getattr(self.bot, "ssu_latest_stats", {}) or {}
             last_update_ts = int(getattr(self.bot, "ssu_last_update_ts", 0) or 0)
             if latest and last_update_ts > 0 and (int(time.time()) - last_update_ts) <= 180:
@@ -197,7 +200,73 @@ class ModerationCog(commands.Cog):
                     "server_code": str(latest.get("server_code", config.get("ssu_server_code", "N/A"))),
                 }
                 return stats, True
-            return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+            return _offline()
+
+        async def _try_prc_v2() -> tuple[dict, bool]:
+            try:
+                session = await self._ensure_http_session()
+                url = api_url or "https://api.policeroleplay.community/v2/server?Staff=true&Queue=true"
+                headers = {
+                    "server-key": api_key,  # PRC v2 requires this header
+                    "Server-Key": api_key,
+                    "Accept": "application/json",
+                }
+                async with session.get(url, headers=headers) as response:
+                    if response.status != 200:
+                        return _offline()
+                    payload = await response.json()
+                    if not isinstance(payload, dict):
+                        return _offline()
+
+                    current_players = payload.get("CurrentPlayers")
+                    max_players = payload.get("MaxPlayers")
+                    join_key = payload.get("JoinKey")
+
+                    staff_obj = payload.get("Staff") or {}
+                    admins = staff_obj.get("Admins") or {}
+                    mods = staff_obj.get("Mods") or {}
+                    helpers = staff_obj.get("Helpers") or {}
+                    staff_online = 0
+                    for m in (admins, mods, helpers):
+                        if isinstance(m, dict):
+                            staff_online += len(m.keys())
+
+                    queue = payload.get("Queue")
+                    queue_count = len(queue) if isinstance(queue, list) else payload.get("QueueCount") or payload.get("queueCount") or "N/A"
+
+                    status = "Online"
+                    try:
+                        if isinstance(current_players, int) and isinstance(max_players, int) and max_players > 0 and current_players >= max_players:
+                            status = "Full"
+                    except Exception:
+                        pass
+
+                    stats = {
+                        "status": status,
+                        "players": f"{current_players}/{max_players}" if isinstance(current_players, int) and isinstance(max_players, int) else str(current_players or "N/A"),
+                        "staff": str(staff_online),
+                        "queue": str(queue_count),
+                        "server_name": str(payload.get("Name") or config.get("ssu_server_name", "Florida Sessions Roleplay")),
+                        "server_code": str(join_key or config.get("ssu_server_code", "N/A")),
+                    }
+                    return stats, True
+            except Exception:
+                return _offline()
+
+        # Mode selection
+        if api_mode == "push":
+            return await _try_push_cache()
+        if api_mode == "prc":
+            return await _try_prc_v2()
+
+        # auto:
+        # - if a URL is provided, use it (existing flexible parser below)
+        # - else try PRC v2, then fall back to push cache
+        if not api_url:
+            stats, ok = await _try_prc_v2()
+            if ok:
+                return stats, True
+            return await _try_push_cache()
 
         try:
             session = await self._ensure_http_session()
@@ -205,14 +274,16 @@ class ModerationCog(commands.Cog):
                 "Authorization": f"Bearer {api_key}",
                 "x-api-key": api_key,
                 "X-API-Key": api_key,
+                "server-key": api_key,
+                "Server-Key": api_key,
                 "Accept": "application/json",
             }
             async with session.get(api_url, headers=headers) as response:
                 if response.status != 200:
-                    return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+                    return _offline()
                 payload = await response.json()
                 if not isinstance(payload, dict):
-                    return {"status": "API Offline", "players": "API Offline", "staff": "API Offline", "queue": "API Offline"}, False
+                    return _offline()
 
                 players_raw = self._pick_stat(payload, "playerCount", "player_count", "players", "currentPlayers")
                 max_players = self._safe_int(self._pick_stat(payload, "maxPlayers", "max_players", "capacity", default="0"), 0)
