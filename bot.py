@@ -357,6 +357,7 @@ class FloridaRPBot(commands.Bot):
         
         super().__init__(command_prefix="!", intents=intents)
         self.web_runner = None
+        self._commands_synced = False
         self.config = {}
         self.db = Database(DATABASE_PATH)
         self.config.update({
@@ -373,7 +374,7 @@ class FloridaRPBot(commands.Bot):
         logger.info("Setting up bot")
         
         # Load cogs
-        cogs = ["cogs.moderation", "cogs.applications", "cogs.training"]
+        cogs = ["cogs.moderation", "cogs.applications", "cogs.training", "cogs.assistance"]
         for cog_module in cogs:
             try:
                 await self.load_extension(cog_module)
@@ -395,6 +396,18 @@ class FloridaRPBot(commands.Bot):
     
     async def on_ready(self):
         logger.info(f"Logged in as {self.user}")
+        if not self._commands_synced:
+            self._commands_synced = True
+            self.loop.create_task(self._sync_commands_background())
+
+    async def _sync_commands_background(self) -> None:
+        try:
+            guild = discord.Object(id=GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+            logger.info("Background command sync completed")
+        except Exception as exc:
+            logger.warning(f"Background command sync failed: {exc}")
     
     async def start_web_server(self):
         async def handle_root(request):
