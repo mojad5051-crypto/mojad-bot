@@ -205,7 +205,7 @@ class ModerationCog(commands.Cog):
         async def _try_prc_v2() -> tuple[dict, bool]:
             try:
                 session = await self._ensure_http_session()
-                url = api_url or "https://api.policeroleplay.community/v2/server?Staff=true&Queue=true"
+                url = api_url or "https://api.policeroleplay.community/v2/server?Staff=true&Queue=true&Players=true"
                 headers = {
                     "server-key": api_key,  # PRC v2 requires this header
                     "Server-Key": api_key,
@@ -222,14 +222,25 @@ class ModerationCog(commands.Cog):
                     max_players = payload.get("MaxPlayers")
                     join_key = payload.get("JoinKey")
 
-                    staff_obj = payload.get("Staff") or {}
-                    admins = staff_obj.get("Admins") or {}
-                    mods = staff_obj.get("Mods") or {}
-                    helpers = staff_obj.get("Helpers") or {}
+                    # Prefer computing "staff online" from the live Players list.
+                    # PRC's Staff object is not always "currently online" count.
                     staff_online = 0
-                    for m in (admins, mods, helpers):
-                        if isinstance(m, dict):
-                            staff_online += len(m.keys())
+                    players_list = payload.get("Players")
+                    if isinstance(players_list, list):
+                        for p in players_list:
+                            if not isinstance(p, dict):
+                                continue
+                            permission = str(p.get("Permission") or "").strip().lower()
+                            if permission and permission not in {"normal", "civilian", "player"}:
+                                staff_online += 1
+                    else:
+                        staff_obj = payload.get("Staff") or {}
+                        admins = staff_obj.get("Admins") or {}
+                        mods = staff_obj.get("Mods") or {}
+                        helpers = staff_obj.get("Helpers") or {}
+                        for m in (admins, mods, helpers):
+                            if isinstance(m, dict):
+                                staff_online += len(m.keys())
 
                     queue = payload.get("Queue")
                     queue_count = len(queue) if isinstance(queue, list) else payload.get("QueueCount") or payload.get("queueCount") or "N/A"
