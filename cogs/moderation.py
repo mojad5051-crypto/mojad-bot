@@ -193,6 +193,17 @@ class ModerationCog(commands.Cog):
         self._recent_notification_log[signature] = now
         return True
 
+    async def _is_recent_duplicate_message(self, channel: discord.TextChannel, embed: discord.Embed, limit: int = 5) -> bool:
+        try:
+            async for message in channel.history(limit=limit):
+                if message.author == self.bot.user and message.embeds:
+                    message_embed = message.embeds[0]
+                    if self._embed_signature(channel.id, message_embed) == self._embed_signature(channel.id, embed):
+                        return True
+        except Exception as exc:
+            logger.warning(f"Duplicate check failed for channel {channel.id}: {exc}")
+        return False
+
     def _pick_stat(self, payload: dict, *keys: str, default: str = "N/A") -> str:
         for key in keys:
             if key in payload and payload[key] is not None:
@@ -515,7 +526,7 @@ class ModerationCog(commands.Cog):
         if infraction_channel is not None:
             # Create the view with the void button
             view = InfractionView(infraction_id, user.id, role, self.bot)
-            if self._should_send_embed_once(infraction_channel.id, embed):
+            if self._should_send_embed_once(infraction_channel.id, embed) and not await self._is_recent_duplicate_message(infraction_channel, embed):
                 message = await infraction_channel.send(embed=embed, view=view)
 
                 # Create a thread for proof submission
@@ -580,7 +591,7 @@ class ModerationCog(commands.Cog):
         # Send to log channel
         promotion_channel = interaction.guild.get_channel(bot_config.get("promotion_log_channel_id") or bot_config.get("review_channel_id"))
         if promotion_channel is not None:
-            if self._should_send_embed_once(promotion_channel.id, embed):
+            if self._should_send_embed_once(promotion_channel.id, embed) and not await self._is_recent_duplicate_message(promotion_channel, embed):
                 await promotion_channel.send(embed=embed)
             else:
                 logger.info("Skipped duplicate promotion embed send")
