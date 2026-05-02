@@ -613,7 +613,8 @@ class ModerationCog(commands.Cog):
         title2="Second section title",
         description2="Second section description",
         footer="Footer text",
-        color="Color code (default: blue)"
+        color="Color code (default: blue)",
+        banner="URL for banner image (optional)"
     )
     async def embed_command(
         self,
@@ -624,7 +625,8 @@ class ModerationCog(commands.Cog):
         title2: str,
         description2: str,
         footer: str,
-        color: str = "3498DB"
+        color: str = "3498DB",
+        banner: str = None
     ) -> None:
         """Send a custom embed with multiple fields"""
         # Check permissions
@@ -646,6 +648,11 @@ class ModerationCog(commands.Cog):
         )
         embed.add_field(name=title1, value=description1, inline=False)
         embed.add_field(name=title2, value=description2, inline=False)
+        
+        # Add banner if provided
+        if banner:
+            embed.set_image(url=banner)
+        
         embed.set_footer(text=footer)
         embed.timestamp = discord.utils.utcnow()
 
