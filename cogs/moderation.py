@@ -539,9 +539,10 @@ class ModerationCog(commands.Cog):
         embed.add_field(name="", value="", inline=False)  # Visual separator
         embed.add_field(name="📝 Reason", value=f"*{reason}*", inline=False)
         
-        # Add moderator avatar
+        # Add moderator avatar and clean footer layout
         bot_config = get_bot_config(self.bot)
         embed.set_author(name=f"Promoted by {interaction.user.name}", icon_url=bot_config.get("logo_url", interaction.user.display_avatar.url))
+        embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500134196142670004/ASD.png?ex=69f75457&is=69f602d7&hm=46d33dbc5daeffc6acffac489c1b2624181e2c33a663af024c38727b3094a9fe&=&format=webp&quality=lossless&width=1156&height=457")
         
         # Timestamp and footer with accent color indicator
         embed.timestamp = discord.utils.utcnow()

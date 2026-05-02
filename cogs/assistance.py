@@ -38,7 +38,7 @@ SUPPORT_OPTIONS = {
         "label": "Internal Affairs Support",
         "description": "For reporting staff members or internal issues",
         "rank": 2,
-        "roles": [1496970664790196344, 1496986660691513505],
+        "roles": [1496970664790196344],
         "channel_id": 1499844111996555404,
     },
     "management": {
