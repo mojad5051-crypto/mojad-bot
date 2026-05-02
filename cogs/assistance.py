@@ -177,38 +177,61 @@ class TicketActionView(discord.ui.View):
         new_name = f"🟢-{opener_name}-claimed-by-{sanitize_name(interaction.user.name, fallback='staff')}"
         await interaction.response.defer(ephemeral=False, thinking=False)
         try:
-            # Lock the channel by updating permissions
+            # Lock the ticket for writing but keep it visible to everyone.
             overwrites = interaction.channel.overwrites.copy()
-            
-            # Remove view permissions from support roles
+
+            # Everyone can still view the ticket, but cannot send messages.
+            overwrites[interaction.guild.default_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=False,
+                read_message_history=True,
+            )
+
+            # Keep support roles able to view but not send.
             visible_role_ids = roles_for_visibility(support_key)
             for role_id in visible_role_ids:
                 role = interaction.guild.get_role(role_id)
-                if role is not None and role in overwrites:
-                    overwrites[role] = discord.PermissionOverwrite(view_channel=False, send_messages=False)
-            
-            # Ensure only claimant, opener, and bot have access
+                if role is not None:
+                    overwrites[role] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=False,
+                        read_message_history=True,
+                    )
+
+            # Openers should still be able to participate.
             opener_member = interaction.guild.get_member(opener_id) if opener_id else None
-            if opener_member and opener_member not in overwrites:
-                overwrites[opener_member] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True)
-            elif opener_member:
-                overwrites[opener_member] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True)
-            
-            if interaction.user not in overwrites:
-                overwrites[interaction.user] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True, manage_messages=True)
-            else:
-                overwrites[interaction.user] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True, manage_messages=True)
-            
+            if opener_member:
+                overwrites[opener_member] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                )
+
+            # Claiming staff can still send and manage messages.
+            overwrites[interaction.user] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+                manage_messages=True,
+            )
+
             # Bot permissions
-            overwrites[interaction.guild.me] = discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True, manage_messages=True)
-            
+            overwrites[interaction.guild.me] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                manage_channels=True,
+                manage_messages=True,
+            )
+
             await interaction.channel.edit(
                 name=new_name[:95],
                 topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, claimed_by=interaction.user.id),
                 overwrites=overwrites,
                 reason=f"Ticket claimed by {interaction.user}",
             )
-            await interaction.followup.send(f"Ticket claimed by {interaction.user.mention} and locked for privacy.", ephemeral=False)
+            await interaction.followup.send(f"Ticket claimed by {interaction.user.mention}. This ticket is now read-only for others.", ephemeral=False)
         except discord.Forbidden:
             await interaction.followup.send("I could not claim this ticket (missing Manage Channels permission).", ephemeral=True)
         except Exception as exc:
@@ -449,14 +472,18 @@ class AssistanceCog(commands.Cog):
 
         if action.value == "request":
             try:
-                overwrites = interaction.channel.overwrites.copy()
-                overwrites[user] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True)
-                await interaction.channel.edit(overwrites=overwrites, reason=f"Access granted to {user} via request by {interaction.user}")
-                await interaction.response.send_message(f"✅ Granted access to {user.mention} for assistance.", ephemeral=True)
+                await interaction.channel.send(
+                    f"🔔 Access request received: {user.mention} has requested access to this ticket.\n"
+                    f"Staff can approve access by running `/ticket access {user.mention}`."
+                )
+                await interaction.response.send_message(
+                    f"✅ Access request announced for {user.mention}. Use `/ticket access {user.mention}` to grant access.",
+                    ephemeral=True,
+                )
             except discord.Forbidden:
-                await interaction.response.send_message("I don't have permission to modify channel permissions.", ephemeral=True)
+                await interaction.response.send_message("I don't have permission to send messages in this ticket.", ephemeral=True)
             except Exception as exc:
-                await interaction.response.send_message(f"Failed to grant access: {exc}", ephemeral=True)
+                await interaction.response.send_message(f"Failed to announce access request: {exc}", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
