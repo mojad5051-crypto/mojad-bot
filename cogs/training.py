@@ -1,3 +1,5 @@
+import time
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -78,12 +80,32 @@ class TrainingShoutView(discord.ui.View):
 class TrainingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._recent_embed_log: dict[str, float] = {}
 
     def check_training_team(self, interaction: discord.Interaction) -> bool:
         """Check if user has training team role or is admin"""
         bot_config = get_bot_config(self.bot)
         has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
         return interaction.user.guild_permissions.manage_guild or has_role
+
+    def _embed_signature(self, channel_id: int, embed: discord.Embed) -> str:
+        parts = [str(channel_id), str(embed.title), str(embed.description), str(embed.footer.text if embed.footer else "")]
+        if embed.author:
+            parts.extend([str(embed.author.name), str(embed.author.icon_url)])
+        for field in embed.fields:
+            parts.extend([str(field.name), str(field.value), str(field.inline)])
+        return "::".join(parts)
+
+    def _should_send_embed_once(self, channel_id: int, embed: discord.Embed, window_seconds: int = 5) -> bool:
+        now = time.time()
+        self._recent_embed_log = {
+            sig: ts for sig, ts in self._recent_embed_log.items() if now - ts < window_seconds
+        }
+        signature = self._embed_signature(channel_id, embed)
+        if signature in self._recent_embed_log:
+            return False
+        self._recent_embed_log[signature] = now
+        return True
 
     @app_commands.command(name="request-training", description="Request a training session (Staff Trainees)")
     @app_commands.describe(
@@ -97,9 +119,9 @@ class TrainingCog(commands.Cog):
         timezone: str
     ) -> None:
         """Request a training session"""
-        # Check if user has training team role
-        if not self.check_training_team(interaction):
-            await interaction.response.send_message("❌ You do not have permission to use this command.", ephemeral=True)
+        # Require the specific trainee role to request training
+        if not has_role_id(interaction.user, 1496970734919094303):
+            await interaction.response.send_message("❌ You must have the Staff Trainee role to request training.", ephemeral=True)
             return
 
         # Create training request embed
@@ -130,8 +152,10 @@ class TrainingCog(commands.Cog):
             # Get the training team role
             training_team_role = interaction.guild.get_role(1496970700097978419)
             role_mention = training_team_role.mention if training_team_role else "<@&1496970700097978419>"
-            
-            await training_request_channel.send(f"{role_mention} New training request!", embed=embed)
+            if self._should_send_embed_once(training_request_channel.id, embed):
+                await training_request_channel.send(f"{role_mention} New training request!", embed=embed)
+            else:
+                await training_request_channel.send(f"{role_mention} Duplicate training request skipped.")
 
         await interaction.response.send_message("✅ Training request submitted! A trainer will contact you soon.", ephemeral=True)
 
@@ -172,7 +196,10 @@ class TrainingCog(commands.Cog):
 
         shout_channel = interaction.channel
         view = TrainingShoutView()
-        await shout_channel.send(embed=embed, view=view)
+        if self._should_send_embed_once(shout_channel.id, embed):
+            await shout_channel.send(embed=embed, view=view)
+        else:
+            await shout_channel.send("Duplicate training shout skipped.")
 
         # Tag staff trainees
         trainee_role = interaction.guild.get_role(1496970734919094303)
@@ -263,7 +290,10 @@ class TrainingCog(commands.Cog):
         # Send to training results channel
         training_results_channel = interaction.guild.get_channel(1496970976955727882)
         if training_results_channel is not None:
-            await training_results_channel.send(embed=embed)
+            if self._should_send_embed_once(training_results_channel.id, embed):
+                await training_results_channel.send(embed=embed)
+            else:
+                await training_results_channel.send("Duplicate training result skipped.")
 
         await interaction.response.send_message("✅ Training results submitted and logged!", ephemeral=True)
 
