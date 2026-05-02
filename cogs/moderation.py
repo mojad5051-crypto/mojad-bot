@@ -526,8 +526,10 @@ class ModerationCog(commands.Cog):
         if infraction_channel is not None:
             # Create the view with the void button
             view = InfractionView(infraction_id, user.id, role, self.bot)
-            if self._should_send_embed_once(infraction_channel.id, embed) and not await self._is_recent_duplicate_message(infraction_channel, embed):
+            signature = self._embed_signature(infraction_channel.id, embed)
+            if self._should_send_embed_once(infraction_channel.id, embed) and not await self._is_recent_duplicate_message(infraction_channel, embed) and not self.bot.db.has_recent_embed_signature(infraction_channel.id, signature):
                 message = await infraction_channel.send(embed=embed, view=view)
+                self.bot.db.record_embed_signature(infraction_channel.id, signature)
 
                 # Create a thread for proof submission
                 try:
@@ -591,8 +593,10 @@ class ModerationCog(commands.Cog):
         # Send to log channel
         promotion_channel = interaction.guild.get_channel(bot_config.get("promotion_log_channel_id") or bot_config.get("review_channel_id"))
         if promotion_channel is not None:
-            if self._should_send_embed_once(promotion_channel.id, embed) and not await self._is_recent_duplicate_message(promotion_channel, embed):
+            signature = self._embed_signature(promotion_channel.id, embed)
+            if self._should_send_embed_once(promotion_channel.id, embed) and not await self._is_recent_duplicate_message(promotion_channel, embed) and not self.bot.db.has_recent_embed_signature(promotion_channel.id, signature):
                 await promotion_channel.send(embed=embed)
+                self.bot.db.record_embed_signature(promotion_channel.id, signature)
             else:
                 logger.info("Skipped duplicate promotion embed send")
 

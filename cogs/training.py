@@ -152,8 +152,10 @@ class TrainingCog(commands.Cog):
             # Get the training team role
             training_team_role = interaction.guild.get_role(1496970700097978419)
             role_mention = training_team_role.mention if training_team_role else "<@&1496970700097978419>"
-            if self._should_send_embed_once(training_request_channel.id, embed):
+            signature = self._embed_signature(training_request_channel.id, embed)
+            if self._should_send_embed_once(training_request_channel.id, embed) and not self.bot.db.has_recent_embed_signature(training_request_channel.id, signature):
                 await training_request_channel.send(f"{role_mention} New training request!", embed=embed)
+                self.bot.db.record_embed_signature(training_request_channel.id, signature)
             else:
                 await training_request_channel.send(f"{role_mention} Duplicate training request skipped.")
 
@@ -196,8 +198,10 @@ class TrainingCog(commands.Cog):
 
         shout_channel = interaction.channel
         view = TrainingShoutView()
-        if self._should_send_embed_once(shout_channel.id, embed):
+        signature = self._embed_signature(shout_channel.id, embed)
+        if self._should_send_embed_once(shout_channel.id, embed) and not self.bot.db.has_recent_embed_signature(shout_channel.id, signature):
             await shout_channel.send(embed=embed, view=view)
+            self.bot.db.record_embed_signature(shout_channel.id, signature)
         else:
             await shout_channel.send("Duplicate training shout skipped.")
 
@@ -290,8 +294,10 @@ class TrainingCog(commands.Cog):
         # Send to training results channel
         training_results_channel = interaction.guild.get_channel(1496970976955727882)
         if training_results_channel is not None:
-            if self._should_send_embed_once(training_results_channel.id, embed):
+            signature = self._embed_signature(training_results_channel.id, embed)
+            if self._should_send_embed_once(training_results_channel.id, embed) and not self.bot.db.has_recent_embed_signature(training_results_channel.id, signature):
                 await training_results_channel.send(embed=embed)
+                self.bot.db.record_embed_signature(training_results_channel.id, signature)
             else:
                 await training_results_channel.send("Duplicate training result skipped.")
 

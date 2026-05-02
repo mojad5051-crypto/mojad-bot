@@ -1,4 +1,5 @@
 import sqlite3
+import time
 from pathlib import Path
 from typing import List, Tuple, Optional
 
@@ -54,6 +55,16 @@ class Database:
                 )
                 """
             )
+            self.connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sent_embed_signatures (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_id INTEGER NOT NULL,
+                    signature TEXT NOT NULL,
+                    created_at INTEGER NOT NULL
+                )
+                """
+            )
 
     def add_infraction(self, user_id: int, moderator_id: int, reason: str, severity: str, appeal_status: str = "Appealable") -> int:
         with self.connection:
@@ -78,6 +89,22 @@ class Database:
                 (user_id, roblox_username),
             )
         return cursor.lastrowid
+
+    def record_embed_signature(self, channel_id: int, signature: str) -> None:
+        timestamp = int(time.time())
+        with self.connection:
+            self.connection.execute(
+                "INSERT INTO sent_embed_signatures (channel_id, signature, created_at) VALUES (?, ?, ?)",
+                (channel_id, signature, timestamp),
+            )
+
+    def has_recent_embed_signature(self, channel_id: int, signature: str, window_seconds: int = 5) -> bool:
+        cutoff = int(time.time()) - window_seconds
+        cursor = self.connection.execute(
+            "SELECT 1 FROM sent_embed_signatures WHERE channel_id = ? AND signature = ? AND created_at >= ? LIMIT 1",
+            (channel_id, signature, cutoff),
+        )
+        return cursor.fetchone() is not None
 
     def get_infractions(self, user_id: int) -> List[sqlite3.Row]:
         cursor = self.connection.execute(
