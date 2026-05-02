@@ -705,6 +705,51 @@ class ModerationCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
+    @app_commands.command(name="departments", description="Post a department showcase with title, description, banner, and link")
+    @app_commands.describe(
+        title="Department name/title",
+        description="Department description and information",
+        banner="Banner image URL",
+        link="Link to department page or resource"
+    )
+    async def departments_command(
+        self,
+        interaction: discord.Interaction,
+        title: str,
+        description: str,
+        banner: str,
+        link: str
+    ) -> None:
+        """Post a department showcase embed"""
+        # Check permissions
+        bot_config = get_bot_config(self.bot)
+        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
+        if not (interaction.user.guild_permissions.manage_guild or has_role):
+            await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
+            return
+
+        # Create department embed
+        embed = discord.Embed(
+            title=f"🏢 {title}",
+            description=description,
+            color=0x1e40af
+        )
+        
+        # Add banner
+        embed.set_image(url=banner)
+        
+        # Add fields
+        embed.add_field(name="📍 Access Department", value=f"[Click Here]({link})", inline=False)
+        
+        # Add author
+        embed.set_author(name="Florida State Roleplay", icon_url=bot_config.get("logo_url", ""))
+        
+        # Timestamp and footer
+        embed.timestamp = discord.utils.utcnow()
+        embed.set_footer(text="Department Showcase • Glass UI", icon_url=interaction.guild.icon if interaction.guild else None)
+
+        await interaction.response.send_message(embed=embed)
+
     @ssu_group.command(name="panel", description="Post a live server status dashboard that updates every 30 seconds.")
     async def ssu_panel_command(self, interaction: discord.Interaction) -> None:
         bot_config = get_bot_config(self.bot)
