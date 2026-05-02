@@ -408,6 +408,7 @@ class AssistanceCog(commands.Cog):
             timestamp=discord.utils.utcnow(),
         )
         embed.set_footer(text="Florida State Roleplay • Assistance")
+        embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500188190043275325/IMG_8648.png?ex=69f786a0&is=69f63520&hm=7e4d109b860eb5c844f0c7b9ad2a2e534860a92b6bbb69122d285646f97a225a&=&format=webp&quality=lossless&width=1156&height=441")
 
         await interaction.response.send_message(embed=embed, view=AssistancePanelView(self.bot))
 
