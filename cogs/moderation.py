@@ -674,9 +674,11 @@ class ModerationCog(commands.Cog):
         )
         embed.add_field(
             name="✅ Requirements",
-            value="• Must be 15+ years old\n• Active in the community\n• Good communication skills",
+            value="• Must be 13 years old or older\n• Active in the community\n• Good communication skills",
             inline=False
         )
+        # Add banner for smooth appearance
+        embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500188337368207531/IMG_8649.png?ex=69f786c3&is=69f63543&hm=1dfaeb5b28bdb0de2321dfe97a3c29a3e2497bbcc91b13b08ac764795f7092ba&=&format=webp&quality=lossless&width=1156&height=460")
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text="Staff Team • Glass UI")
 
