@@ -26,6 +26,32 @@ def sanitize_name(value: str, *, fallback: str) -> str:
     return safe[:50]
 
 
+def get_next_ticket_case(bot: commands.Bot, guild: discord.Guild) -> int:
+    if not hasattr(bot, "ticket_case_counter_by_guild"):
+        bot.ticket_case_counter_by_guild = {}
+
+    current = bot.ticket_case_counter_by_guild.get(guild.id)
+    if current is None:
+        current = 1000
+        for channel in guild.channels:
+            if isinstance(channel, discord.TextChannel):
+                parsed = parse_topic(getattr(channel, "topic", ""))
+                case_number = parsed.get("case_number", 0)
+                if case_number and case_number >= current:
+                    current = case_number + 1
+    bot.ticket_case_counter_by_guild[guild.id] = current + 1
+    return current
+
+
+def find_ticket_channel_by_case(guild: discord.Guild, case_number: int) -> discord.TextChannel | None:
+    for channel in guild.channels:
+        if isinstance(channel, discord.TextChannel):
+            parsed = parse_topic(getattr(channel, "topic", ""))
+            if parsed.get("case_number") == case_number:
+                return channel
+    return None
+
+
 SUPPORT_OPTIONS = {
     "general": {
         "label": "General Support",
@@ -69,19 +95,21 @@ def roles_for_visibility(selected_key: str) -> list[int]:
     return sorted(role_ids)
 
 
-def build_topic(*, opener_id: int, support_key: str, support_label: str, claimed_by: int | None = None) -> str:
+def build_topic(*, opener_id: int, support_key: str, support_label: str, case_number: int, claimed_by: int | None = None) -> str:
     claim_part = f"claimed={claimed_by}" if claimed_by is not None else "claimed=none"
-    return f"assist opener={opener_id} type={support_key} label={support_label} {claim_part}"
+    return f"assist opener={opener_id} type={support_key} label={support_label} case={case_number} {claim_part}"
 
 
 def parse_topic(topic: str | None) -> dict:
     raw = topic or ""
     opener_match = re.search(r"opener=(\d+)", raw)
     type_match = re.search(r"type=([a-z]+)", raw)
+    case_match = re.search(r"case=(\d+)", raw)
     claimed_match = re.search(r"claimed=([a-z0-9]+)", raw)
     return {
         "opener_id": int(opener_match.group(1)) if opener_match else 0,
         "support_key": type_match.group(1) if type_match else "",
+        "case_number": int(case_match.group(1)) if case_match else 0,
         "claimed_by": int(claimed_match.group(1)) if claimed_match and claimed_match.group(1).isdigit() else None,
     }
 
@@ -174,7 +202,9 @@ class TicketActionView(discord.ui.View):
             if opener_member is not None:
                 opener_name = sanitize_name(opener_member.name, fallback="user")
 
-        new_name = f"🟢-{opener_name}-claimed-by-{sanitize_name(interaction.user.name, fallback='staff')}"
+        case_number = parsed.get("case_number", 0)
+        case_prefix = f"case-{case_number}-" if case_number else ""
+        new_name = f"🟢-{case_prefix}{opener_name}-claimed-by-{sanitize_name(interaction.user.name, fallback='staff')}"
         await interaction.response.defer(ephemeral=False, thinking=False)
         try:
             # Lock the ticket for writing but keep it visible to everyone.
@@ -227,7 +257,7 @@ class TicketActionView(discord.ui.View):
 
             await interaction.channel.edit(
                 name=new_name[:95],
-                topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, claimed_by=interaction.user.id),
+                topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, case_number=case_number, claimed_by=interaction.user.id),
                 overwrites=overwrites,
                 reason=f"Ticket claimed by {interaction.user}",
             )
@@ -255,12 +285,14 @@ class TicketActionView(discord.ui.View):
             else:
                 opener_name = sanitize_name(str(opener_id), fallback="user")
 
-        new_name = f"🔴-{opener_name}-assistance"
+        case_number = parsed.get("case_number", 0)
+        case_prefix = f"case-{case_number}-" if case_number else ""
+        new_name = f"🔴-{case_prefix}{opener_name}-assistance"
         await interaction.response.defer(ephemeral=False, thinking=False)
         try:
             await interaction.channel.edit(
                 name=new_name[:95],
-                topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, claimed_by=None),
+                topic=build_topic(opener_id=opener_id, support_key=support_key, support_label=support_label, case_number=case_number, claimed_by=None),
                 reason=f"Ticket unclaimed by {interaction.user}",
             )
             await interaction.followup.send("Ticket unclaimed and reset to open status.", ephemeral=False)
@@ -308,7 +340,8 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
             if role is not None:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
 
-        ticket_name = f"🔴-{sanitize_name(interaction.user.name, fallback='user')}-assistance"
+        case_number = get_next_ticket_case(self.bot, interaction.guild)
+        ticket_name = f"🔴-case-{case_number}-{sanitize_name(interaction.user.name, fallback='user')}-assistance"
         category = interaction.channel.category if interaction.channel is not None else None
         anchor_channel = interaction.guild.get_channel(option.get("channel_id") or TICKET_TARGET_CHANNEL_ID)
         if anchor_channel is not None:
@@ -325,6 +358,7 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
                 opener_id=interaction.user.id,
                 support_key=self.support_key,
                 support_label=option["label"],
+                case_number=case_number,
                 claimed_by=None,
             ),
             reason=f"Assistance ticket created by {interaction.user}",
@@ -345,6 +379,7 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
             timestamp=discord.utils.utcnow(),
         )
         embed.add_field(name="Support Type", value=option["label"], inline=True)
+        embed.add_field(name="Ticket Case", value=f"#{case_number}", inline=True)
         embed.add_field(name="Created By", value=interaction.user.mention, inline=True)
         embed.add_field(name="Reason", value=self.reason.value.strip(), inline=False)
         embed.add_field(name="Assigned Team", value=selected_role_mentions or "No roles configured", inline=False)
@@ -436,9 +471,9 @@ class AssistanceCog(commands.Cog):
         await interaction.response.send_message(embed=embed, view=AssistancePanelView(self.bot))
 
     @app_commands.command(name="ticket", description="Manage ticket access permissions.")
-    @app_commands.describe(action="The action to perform", user="The user to grant access to")
+    @app_commands.describe(action="The action to perform", case="The ticket case number", user="The user to grant access to")
     @app_commands.choices(action=[app_commands.Choice(name="access", value="access")])
-    async def ticket_command(self, interaction: discord.Interaction, action: app_commands.Choice[str], user: discord.Member) -> None:
+    async def ticket_command(self, interaction: discord.Interaction, action: app_commands.Choice[str], case: int, user: discord.Member) -> None:
         if interaction.guild is None or interaction.channel is None:
             await interaction.response.send_message("This command can only be used in a server channel.", ephemeral=True)
             return
@@ -448,20 +483,24 @@ class AssistanceCog(commands.Cog):
             return
 
         if action.value == "access":
+            ticket_channel = find_ticket_channel_by_case(interaction.guild, case)
+            if ticket_channel is None:
+                await interaction.response.send_message(f"Could not find ticket case #{case}.", ephemeral=True)
+                return
             try:
-                overwrites = interaction.channel.overwrites.copy()
+                overwrites = ticket_channel.overwrites.copy()
                 overwrites[user] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True)
-                await interaction.channel.edit(overwrites=overwrites, reason=f"Access granted to {user} by {interaction.user}")
-                await interaction.response.send_message(f"✅ Granted access to {user.mention} in this ticket.", ephemeral=True)
+                await ticket_channel.edit(overwrites=overwrites, reason=f"Access granted to {user} by {interaction.user}")
+                await interaction.response.send_message(f"✅ Granted access to {user.mention} in ticket case #{case}.", ephemeral=True)
             except discord.Forbidden:
                 await interaction.response.send_message("I don't have permission to modify channel permissions.", ephemeral=True)
             except Exception as exc:
                 await interaction.response.send_message(f"Failed to grant access: {exc}", ephemeral=True)
 
     @app_commands.command(name="access", description="Request or manage access for assistance.")
-    @app_commands.describe(action="The action to perform", user="The user requesting assistance")
+    @app_commands.describe(action="The action to perform", case="The ticket case number", user="The user requesting assistance")
     @app_commands.choices(action=[app_commands.Choice(name="request", value="request")])
-    async def access_command(self, interaction: discord.Interaction, action: app_commands.Choice[str], user: discord.Member) -> None:
+    async def access_command(self, interaction: discord.Interaction, action: app_commands.Choice[str], case: int, user: discord.Member) -> None:
         if interaction.guild is None or interaction.channel is None:
             await interaction.response.send_message("This command can only be used in a server channel.", ephemeral=True)
             return
@@ -471,13 +510,19 @@ class AssistanceCog(commands.Cog):
             return
 
         if action.value == "request":
+            ticket_channel = interaction.channel
+            if ticket_channel is None or parse_topic(getattr(ticket_channel, "topic", "")).get("case_number", 0) == 0:
+                ticket_channel = find_ticket_channel_by_case(interaction.guild, case)
+            if ticket_channel is None:
+                await interaction.response.send_message(f"Could not find ticket case #{case}.", ephemeral=True)
+                return
             try:
-                await interaction.channel.send(
-                    f"🔔 Access request received: {user.mention} has requested access to this ticket.\n"
-                    f"Staff can approve access by running `/ticket access {user.mention}`."
+                await ticket_channel.send(
+                    f"🔔 Access request received: {user.mention} has requested access to ticket case #{case}.\n"
+                    f"Staff can approve access by running `/ticket access {case} {user.mention}`."
                 )
                 await interaction.response.send_message(
-                    f"✅ Access request announced for {user.mention}. Use `/ticket access {user.mention}` to grant access.",
+                    f"✅ Access request announced in ticket case #{case}. Use `/ticket access {case} {user.mention}` to grant access.",
                     ephemeral=True,
                 )
             except discord.Forbidden:
