@@ -514,7 +514,7 @@ class ModerationCog(commands.Cog):
         
         # Add header logo at top
         bot_config = get_bot_config(self.bot)
-        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500189082783973438/IMG_8650.png?ex=69f78775&is=69f635f5&hm=8e9b5b8b75f21b9ecf4c164f31c85838da2bf8d97dcc2b606ba9b50417a70c53&=&format=webp&quality=lossless&width=1156&height=449")
+        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500139128950362162/c3069925b0f7a69d71bebe174e873d40.webp?ex=69f758ef&is=69f6076f&hm=8d31b42d5d3ad2325bb2685dab6b4b234f787038c9231d940276f3564b245fdb&=&format=webp&width=115&height=115")
         
         # Add infraction banner
         embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500187959935242280/IMG_8647.png?ex=69f78669&is=69f634e9&hm=7c37cb05c90a2a081bb8f599725f6eeb093aa0b223a585b52e42505bb326307f&=&format=webp&quality=lossless&width=1156&height=440")
@@ -585,7 +585,7 @@ class ModerationCog(commands.Cog):
         # Add header logo at top for smooth branded appearance
         embed.set_author(
             name="Florida State Roleplay",
-            icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500189082783973438/IMG_8650.png?ex=69f78775&is=69f635f5&hm=8e9b5b8b75f21b9ecf4c164f31c85838da2bf8d97dcc2b606ba9b50417a70c53&=&format=webp&quality=lossless&width=1156&height=449",
+            icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500139128950362162/c3069925b0f7a69d71bebe174e873d40.webp?ex=69f758ef&is=69f6076f&hm=8d31b42d5d3ad2325bb2685dab6b4b234f787038c9231d940276f3564b245fdb&=&format=webp&width=115&height=115",
         )
         embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500134196142670004/ASD.png?ex=69f75457&is=69f602d7&hm=46d33dbc5daeffc6acffac489c1b2624181e2c33a663af024c38727b3094a9fe&=&format=webp&quality=lossless&width=1156&height=457")
         
@@ -685,7 +685,7 @@ class ModerationCog(commands.Cog):
             inline=False
         )
         # Add header logo at top
-        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500189082783973438/IMG_8650.png?ex=69f78775&is=69f635f5&hm=8e9b5b8b75f21b9ecf4c164f31c85838da2bf8d97dcc2b606ba9b50417a70c53&=&format=webp&quality=lossless&width=1156&height=449")
+        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500139128950362162/c3069925b0f7a69d71bebe174e873d40.webp?ex=69f758ef&is=69f6076f&hm=8d31b42d5d3ad2325bb2685dab6b4b234f787038c9231d940276f3564b245fdb&=&format=webp&width=115&height=115")
         # Add banner for smooth appearance
         embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500188337368207531/IMG_8649.png?ex=69f786c3&is=69f63543&hm=1dfaeb5b28bdb0de2321dfe97a3c29a3e2497bbcc91b13b08ac764795f7092ba&=&format=webp&quality=lossless&width=1156&height=460")
         embed.timestamp = discord.utils.utcnow()
@@ -744,7 +744,7 @@ class ModerationCog(commands.Cog):
         embed.add_field(name="📍 Access Department", value=f"[Click Here]({link})", inline=False)
         
         # Add header logo at top
-        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500189082783973438/IMG_8650.png?ex=69f78775&is=69f635f5&hm=8e9b5b8b75f21b9ecf4c164f31c85838da2bf8d97dcc2b606ba9b50417a70c53&=&format=webp&quality=lossless&width=1156&height=449")
+        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500139128950362162/c3069925b0f7a69d71bebe174e873d40.webp?ex=69f758ef&is=69f6076f&hm=8d31b42d5d3ad2325bb2685dab6b4b234f787038c9231d940276f3564b245fdb&=&format=webp&width=115&height=115")
         
         # Timestamp and footer
         embed.timestamp = discord.utils.utcnow()
