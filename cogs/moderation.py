@@ -1,9 +1,12 @@
+import logging
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 import aiohttp
 import time
 
+logger = logging.getLogger(__name__)
 
 def get_bot_config(bot: commands.Bot) -> dict:
     return getattr(bot, "config", {})
@@ -154,6 +157,7 @@ class ModerationCog(commands.Cog):
         self.bot = bot
         self._ssu_panels: dict[int, tuple[int, int]] = {}
         self._http_session: aiohttp.ClientSession | None = None
+        self._recent_notification_log: dict[str, float] = {}
         self.ssu_refresh_loop.start()
 
     def cog_unload(self) -> None:
@@ -169,6 +173,25 @@ class ModerationCog(commands.Cog):
             return int(value)
         except Exception:
             return default
+
+    def _embed_signature(self, channel_id: int, embed: discord.Embed) -> str:
+        parts = [str(channel_id), str(embed.title), str(embed.description)]
+        for field in embed.fields:
+            parts.append(str(field.name))
+            parts.append(str(field.value))
+            parts.append(str(field.inline))
+        return "::".join(parts)
+
+    def _should_send_embed_once(self, channel_id: int, embed: discord.Embed, window_seconds: int = 5) -> bool:
+        now = time.time()
+        self._recent_notification_log = {
+            sig: ts for sig, ts in self._recent_notification_log.items() if now - ts < window_seconds
+        }
+        signature = self._embed_signature(channel_id, embed)
+        if signature in self._recent_notification_log:
+            return False
+        self._recent_notification_log[signature] = now
+        return True
 
     def _pick_stat(self, payload: dict, *keys: str, default: str = "N/A") -> str:
         for key in keys:
@@ -492,19 +515,22 @@ class ModerationCog(commands.Cog):
         if infraction_channel is not None:
             # Create the view with the void button
             view = InfractionView(infraction_id, user.id, role, self.bot)
-            message = await infraction_channel.send(embed=embed, view=view)
+            if self._should_send_embed_once(infraction_channel.id, embed):
+                message = await infraction_channel.send(embed=embed, view=view)
 
-            # Create a thread for proof submission
-            try:
-                thread = await message.create_thread(
-                    name=f"Appeal Evidence - {user.name}",
-                    auto_archive_duration=1440
-                )
-                embed.add_field(name="📋 Evidence Thread", value=f"[Submit Proof]({thread.jump_url})", inline=False)
-                await message.edit(embed=embed)
-            except discord.Forbidden:
-                embed.add_field(name="⚠️ Note", value="Could not create thread - bot lacks permissions.", inline=False)
-                await message.edit(embed=embed)
+                # Create a thread for proof submission
+                try:
+                    thread = await message.create_thread(
+                        name=f"Appeal Evidence - {user.name}",
+                        auto_archive_duration=1440
+                    )
+                    embed.add_field(name="📋 Evidence Thread", value=f"[Submit Proof]({thread.jump_url})", inline=False)
+                    await message.edit(embed=embed)
+                except discord.Forbidden:
+                    embed.add_field(name="⚠️ Note", value="Could not create thread - bot lacks permissions.", inline=False)
+                    await message.edit(embed=embed)
+            else:
+                logger.info("Skipped duplicate infraction embed send")
 
         await interaction.response.send_message("Infraction issued and logged.", ephemeral=True)
 
@@ -538,10 +564,13 @@ class ModerationCog(commands.Cog):
         embed.add_field(name="⬛ New Role", value=f"`{role.name}`", inline=True)
         embed.add_field(name="", value="", inline=False)  # Visual separator
         embed.add_field(name="📝 Reason", value=f"*{reason}*", inline=False)
+        embed.add_field(name="👤 Promoted by", value=interaction.user.mention, inline=False)
         
-        # Add moderator avatar and clean footer layout
-        bot_config = get_bot_config(self.bot)
-        embed.set_author(name=f"Promoted by {interaction.user.name}", icon_url=bot_config.get("logo_url", interaction.user.display_avatar.url))
+        # Add server logo at the top for a smooth branded header
+        embed.set_author(
+            name="Florida State Roleplay",
+            icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500139128950362162/c3069925b0f7a69d71bebe174e873d40.webp?ex=69f758ef&is=69f6076f&hm=8d31b42d5d3ad2325bb2685dab6b4b234f787038c9231d940276f3564b245fdb&=&format=webp&width=115&height=115",
+        )
         embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500134196142670004/ASD.png?ex=69f75457&is=69f602d7&hm=46d33dbc5daeffc6acffac489c1b2624181e2c33a663af024c38727b3094a9fe&=&format=webp&quality=lossless&width=1156&height=457")
         
         # Timestamp and footer with accent color indicator
@@ -551,7 +580,10 @@ class ModerationCog(commands.Cog):
         # Send to log channel
         promotion_channel = interaction.guild.get_channel(bot_config.get("promotion_log_channel_id") or bot_config.get("review_channel_id"))
         if promotion_channel is not None:
-            await promotion_channel.send(embed=embed)
+            if self._should_send_embed_once(promotion_channel.id, embed):
+                await promotion_channel.send(embed=embed)
+            else:
+                logger.info("Skipped duplicate promotion embed send")
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
 
