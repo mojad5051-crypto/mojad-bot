@@ -516,6 +516,9 @@ class ModerationCog(commands.Cog):
         bot_config = get_bot_config(self.bot)
         embed.set_author(name="Moderation Action", icon_url=bot_config.get("logo_url", interaction.user.display_avatar.url))
         
+        # Add infraction banner
+        embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500187959935242280/IMG_8647.png?ex=69f78669&is=69f634e9&hm=7c37cb05c90a2a081bb8f599725f6eeb093aa0b223a585b52e42505bb326307f&=&format=webp&quality=lossless&width=1156&height=440")
+        
         # Timestamp and footer with accent color indicator
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text=f"Infraction ID: {infraction_id} • Glass UI", icon_url=interaction.guild.icon)
