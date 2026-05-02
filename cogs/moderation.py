@@ -474,10 +474,10 @@ class ModerationCog(commands.Cog):
         status: app_commands.Choice[str] = None
     ) -> None:
         """Issue an infraction to a user"""
-        # Check permissions
-        bot_config = get_bot_config(self.bot)
-        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
-        if not (interaction.user.guild_permissions.manage_guild or has_role):
+        # Check permissions - allow specific roles
+        allowed_roles = [1496970664790196344, 1496970658557464586, 1496970649527255110]
+        has_allowed_role = any(role.id in allowed_roles for role in interaction.user.roles)
+        if not (interaction.user.guild_permissions.manage_guild or has_allowed_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
 
@@ -550,10 +550,10 @@ class ModerationCog(commands.Cog):
     @app_commands.command(name="promote", description="Promote a user by assigning a new role and removing the old one")
     @app_commands.describe(user="The user to promote", role="The new role to assign", reason="The reason for the promotion")
     async def promote_command(self, interaction: discord.Interaction, user: discord.Member, role: discord.Role, reason: str) -> None:
-        # Check permissions
-        bot_config = get_bot_config(self.bot)
-        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
-        if not (interaction.user.guild_permissions.manage_guild or has_role):
+        # Check permissions - allow specific roles
+        allowed_roles = [1496970658557464586, 1496970649527255110]
+        has_allowed_role = any(role.id in allowed_roles for role in interaction.user.roles)
+        if not (interaction.user.guild_permissions.manage_guild or has_allowed_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
 
@@ -624,10 +624,10 @@ class ModerationCog(commands.Cog):
         color: str = "3498DB"
     ) -> None:
         """Send a custom embed with multiple fields"""
-        # Check permissions
-        bot_config = get_bot_config(self.bot)
-        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
-        if not (interaction.user.guild_permissions.manage_guild or has_role):
+        # Check permissions - allow specific roles
+        allowed_roles = [1496970664790196344, 1496970658557464586, 1496970649527255110]
+        has_allowed_role = any(role.id in allowed_roles for role in interaction.user.roles)
+        if not (interaction.user.guild_permissions.manage_guild or has_allowed_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
 
