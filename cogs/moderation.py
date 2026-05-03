@@ -476,7 +476,7 @@ class ModerationCog(commands.Cog):
         """Issue an infraction to a user"""
         # Check permissions
         bot_config = get_bot_config(self.bot)
-        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
+        has_role = any(role.name in ["Staff", "Moderator", "Admin"] for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.manage_guild or has_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
@@ -555,7 +555,7 @@ class ModerationCog(commands.Cog):
     async def promote_command(self, interaction: discord.Interaction, user: discord.Member, role: discord.Role, reason: str) -> None:
         # Check permissions
         bot_config = get_bot_config(self.bot)
-        has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
+        has_role = any(role.name in ["Staff", "Moderator", "Admin"] for role in interaction.user.roles)
         if not (interaction.user.guild_permissions.manage_guild or has_role):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
