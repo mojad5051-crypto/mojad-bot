@@ -514,7 +514,7 @@ class ModerationCog(commands.Cog):
         
         # Add header logo at top
         bot_config = get_bot_config(self.bot)
-        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500139128950362162/c3069925b0f7a69d71bebe174e873d40.webp?ex=69f758ef&is=69f6076f&hm=8d31b42d5d3ad2325bb2685dab6b4b234f787038c9231d940276f3564b245fdb&=&format=webp&width=115&height=115")
+        embed.set_author(name="Florida State Roleplay", icon_url="https://media.discordapp.net/attachments/1502805901067944079/1503215481220501646/ChatGPT_Image_May_5_2026_09_01_11_PM.png?ex=6a0332c3&is=6a01e143&hm=578317e125f3d883cf48423a70a196188bbc98638ab194ab0442f7d896f1d470&=&format=webp&quality=lossless&width=703&height=703")
         
         # Add infraction banner
         embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500187959935242280/IMG_8647.png?ex=69f78669&is=69f634e9&hm=7c37cb05c90a2a081bb8f599725f6eeb093aa0b223a585b52e42505bb326307f&=&format=webp&quality=lossless&width=1156&height=440")
@@ -585,7 +585,7 @@ class ModerationCog(commands.Cog):
         # Add header logo at top for smooth branded appearance
         embed.set_author(
             name="Florida State Roleplay",
-            icon_url="https://media.discordapp.net/attachments/1500075037959389265/1500139128950362162/c3069925b0f7a69d71bebe174e873d40.webp?ex=69f758ef&is=69f6076f&hm=8d31b42d5d3ad2325bb2685dab6b4b234f787038c9231d940276f3564b245fdb&=&format=webp&width=115&height=115",
+            icon_url="https://media.discordapp.net/attachments/1502805901067944079/1503215481220501646/ChatGPT_Image_May_5_2026_09_01_11_PM.png?ex=6a0332c3&is=6a01e143&hm=578317e125f3d883cf48423a70a196188bbc98638ab194ab0442f7d896f1d470&=&format=webp&quality=lossless&width=703&height=703",
         )
         embed.set_image(url="https://media.discordapp.net/attachments/1500075037959389265/1500134196142670004/ASD.png?ex=69f75457&is=69f602d7&hm=46d33dbc5daeffc6acffac489c1b2624181e2c33a663af024c38727b3094a9fe&=&format=webp&quality=lossless&width=1156&height=457")
         
