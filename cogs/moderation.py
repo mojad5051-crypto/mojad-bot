@@ -621,7 +621,7 @@ class ModerationCog(commands.Cog):
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
 
-    @commands.command(name="role")
+    @commands.command(name="role", aliases=["r"])
     async def role(self, ctx: commands.Context, member: discord.Member, role_id: int) -> None:
         """Assign a role to a user using promotion-role permissions."""
         if ctx.guild is None:
@@ -666,7 +666,7 @@ class ModerationCog(commands.Cog):
         except Exception as exc:
             await ctx.send(f"Failed to update nickname: {exc}")
 
-    @commands.command(name="say")
+    @commands.command(name="say", aliases=["s"])
     async def say(self, ctx: commands.Context, *, message: str) -> None:
         """Have the bot say a message using promotion-role permissions."""
         if ctx.guild is None:
