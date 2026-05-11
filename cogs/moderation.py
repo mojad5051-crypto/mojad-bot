@@ -621,11 +621,6 @@ class ModerationCog(commands.Cog):
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
 
-    @app_commands.command(name="promotion", description="Promote a user by assigning a new role and removing the old one")
-    @app_commands.describe(user="The user to promote", role="The new role to assign", reason="The reason for the promotion")
-    async def promotion_command(self, interaction: discord.Interaction, user: discord.Member, role: discord.Role, reason: str) -> None:
-        await self.promote_command(interaction, user, role, reason)
-
     @commands.command(name="role")
     async def role(self, ctx: commands.Context, member: discord.Member, role_id: int) -> None:
         """Assign a role to a user using promotion-role permissions."""
