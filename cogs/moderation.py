@@ -125,20 +125,60 @@ class VoteSessionButton(discord.ui.Button):
         self.cog = cog
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        if interaction.message is None or interaction.user.id is None:
-            await interaction.response.send_message("Error: Could not process vote.", ephemeral=True)
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Only administrators can open the voting panel.", ephemeral=True)
             return
 
-        message_id = interaction.message.id
-        if message_id not in self.cog._ssu_session_voters:
-            self.cog._ssu_session_voters[message_id] = set()
+        if interaction.message is None or interaction.channel is None:
+            await interaction.response.send_message("Error: Could not open voting panel.", ephemeral=True)
+            return
 
-        if interaction.user.id in self.cog._ssu_session_voters[message_id]:
-            self.cog._ssu_session_voters[message_id].discard(interaction.user.id)
-            await interaction.response.send_message(f"❌ Your vote for session has been removed.", ephemeral=True)
-        else:
-            self.cog._ssu_session_voters[message_id].add(interaction.user.id)
-            await interaction.response.send_message(f"✅ You voted for session! ({len(self.cog._ssu_session_voters[message_id])} votes)", ephemeral=True)
+        # Create voting embed
+        embed = discord.Embed(
+            title="🗳️ Session Vote",
+            description="The session needs **5 votes** to start. Click below to vote!",
+            color=0x5865F2,
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(
+            name="📋 How it works",
+            value="React or respond to register your vote. Once we reach 5 votes, an admin can start the session.",
+            inline=False
+        )
+        embed.set_footer(text="Vote for Session • React to participate")
+        
+        # Create a voting view
+        class VotingView(discord.ui.View):
+            def __init__(self, cog, message_id):
+                super().__init__(timeout=None)
+                self.cog = cog
+                self.message_id = message_id
+            
+            @discord.ui.button(label="✅ Vote", style=discord.ButtonStyle.green, custom_id="ssu_cast_vote")
+            async def vote_button(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+                if not isinstance(button_interaction.user, discord.Member):
+                    await button_interaction.response.send_message("Error: Could not register vote.", ephemeral=True)
+                    return
+                
+                if self.message_id not in self.cog._ssu_session_voters:
+                    self.cog._ssu_session_voters[self.message_id] = set()
+                
+                if button_interaction.user.id in self.cog._ssu_session_voters[self.message_id]:
+                    self.cog._ssu_session_voters[self.message_id].discard(button_interaction.user.id)
+                    await button_interaction.response.send_message("❌ Your vote has been removed.", ephemeral=True)
+                else:
+                    self.cog._ssu_session_voters[self.message_id].add(button_interaction.user.id)
+                    vote_count = len(self.cog._ssu_session_voters[self.message_id])
+                    remaining = max(0, 5 - vote_count)
+                    await button_interaction.response.send_message(f"✅ Vote registered! ({vote_count}/5 votes{f' - {remaining} more needed!' if remaining > 0 else ' - Session ready to start!'})", ephemeral=True)
+        
+        await interaction.response.defer(ephemeral=True)
+        message = await interaction.channel.send(
+            content=f"<@&1497021079842193558>",
+            embed=embed,
+            view=VotingView(self.cog, interaction.message.id)
+        )
+        await interaction.followup.send("✅ Voting panel opened!", ephemeral=True)
 
 
 class StartSessionButton(discord.ui.Button):
