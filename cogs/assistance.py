@@ -326,8 +326,7 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
             return
 
         option = SUPPORT_OPTIONS[self.support_key]
-        visible_role_ids = roles_for_visibility(self.support_key)
-        selected_role_ids = option["roles"]
+        visible_role_ids = option["roles"]
 
         overwrites: dict[discord.abc.Snowflake, discord.PermissionOverwrite] = {
             interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -338,7 +337,7 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
         for role_id in visible_role_ids:
             role = interaction.guild.get_role(role_id)
             if role is not None:
-                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True)
 
         case_number = get_next_ticket_case(self.bot, interaction.guild)
         ticket_name = f"🔴-case-{case_number}-{sanitize_name(interaction.user.name, fallback='user')}-assistance"
@@ -370,7 +369,7 @@ class AssistanceReasonModal(discord.ui.Modal, title="Assistance Ticket Reason"):
             except Exception:
                 pass
 
-        selected_role_mentions = " ".join(f"<@&{rid}>" for rid in selected_role_ids)
+        selected_role_mentions = " ".join(f"<@&{rid}>" for rid in visible_role_ids)
 
         embed = discord.Embed(
             title="Assistance Ticket Opened",
