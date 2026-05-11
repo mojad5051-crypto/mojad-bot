@@ -118,6 +118,99 @@ class InfractionView(discord.ui.View):
         self.add_item(button)
 
 
+class VoteSessionButton(discord.ui.Button):
+    def __init__(self, bot: commands.Bot, cog):
+        super().__init__(label="Vote for Session", style=discord.ButtonStyle.blurple, custom_id="ssu_vote_session")
+        self.bot = bot
+        self.cog = cog
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if interaction.message is None or interaction.user.id is None:
+            await interaction.response.send_message("Error: Could not process vote.", ephemeral=True)
+            return
+
+        message_id = interaction.message.id
+        if message_id not in self.cog._ssu_session_voters:
+            self.cog._ssu_session_voters[message_id] = set()
+
+        if interaction.user.id in self.cog._ssu_session_voters[message_id]:
+            self.cog._ssu_session_voters[message_id].discard(interaction.user.id)
+            await interaction.response.send_message(f"❌ Your vote for session has been removed.", ephemeral=True)
+        else:
+            self.cog._ssu_session_voters[message_id].add(interaction.user.id)
+            await interaction.response.send_message(f"✅ You voted for session! ({len(self.cog._ssu_session_voters[message_id])} votes)", ephemeral=True)
+
+
+class StartSessionButton(discord.ui.Button):
+    def __init__(self, bot: commands.Bot, cog):
+        super().__init__(label="Start Session", style=discord.ButtonStyle.success, custom_id="ssu_start_session")
+        self.bot = bot
+        self.cog = cog
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Only administrators can start a session.", ephemeral=True)
+            return
+
+        if interaction.message is None:
+            await interaction.response.send_message("Error: Could not start session.", ephemeral=True)
+            return
+
+        message_id = interaction.message.id
+        voters = self.cog._ssu_session_voters.get(message_id, set())
+        
+        new_state = "Started"
+        setattr(self.bot, "ssu_session_state", new_state)
+        await self.cog._refresh_ssu_panels_once()
+
+        # Build mention string for voters and the session role
+        voter_mentions = " ".join(f"<@{uid}>" for uid in voters) if voters else "(no votes)"
+        session_role_mention = "<@&1497021079842193558>"
+        
+        try:
+            await interaction.channel.send(
+                f"{session_role_mention} **Session Started** — the server is now online.\n"
+                f"Voted members: {voter_mentions}"
+            )
+        except Exception:
+            pass
+
+        await interaction.response.send_message(f"✅ Session started! Tagged {len(voters)} voter(s).", ephemeral=True)
+
+
+class ShutdownSessionButton(discord.ui.Button):
+    def __init__(self, bot: commands.Bot, cog):
+        super().__init__(label="Session Shutdown", style=discord.ButtonStyle.danger, custom_id="ssu_shutdown_session")
+        self.bot = bot
+        self.cog = cog
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Only administrators can shut down a session.", ephemeral=True)
+            return
+
+        if interaction.message is None:
+            await interaction.response.send_message("Error: Could not shut down session.", ephemeral=True)
+            return
+
+        message_id = interaction.message.id
+        
+        new_state = "Shutdown"
+        setattr(self.bot, "ssu_session_state", new_state)
+        await self.cog._refresh_ssu_panels_once()
+
+        session_role_mention = "<@&1497021079842193558>"
+        
+        try:
+            await interaction.channel.send(
+                f"{session_role_mention} **Session Shutdown** — the server is now offline."
+            )
+        except Exception:
+            pass
+
+        await interaction.response.send_message(f"✅ Session shut down.", ephemeral=True)
+
+
 class SessionRoleToggleButton(discord.ui.Button):
     def __init__(self, bot: commands.Bot):
         super().__init__(label="Session Role", style=discord.ButtonStyle.secondary, custom_id="ssu_toggle_role")
@@ -148,9 +241,12 @@ class SessionRoleToggleButton(discord.ui.Button):
 
 
 class SSUPanelView(discord.ui.View):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot, cog=None):
         super().__init__(timeout=None)
         config = get_bot_config(bot)
+        self.add_item(VoteSessionButton(bot, cog))
+        self.add_item(StartSessionButton(bot, cog))
+        self.add_item(ShutdownSessionButton(bot, cog))
         self.add_item(SessionRoleToggleButton(bot))
         join_url = str(config.get("server_online_url", "") or "").strip()
         if join_url:
@@ -165,6 +261,7 @@ class ModerationCog(commands.Cog):
         self._ssu_panels: dict[int, tuple[int, int]] = {}
         self._http_session: aiohttp.ClientSession | None = None
         self._recent_notification_log: dict[str, float] = {}
+        self._ssu_session_voters: dict[int, set[int]] = {}  # message_id -> set of voter user_ids
         self.ssu_refresh_loop.start()
 
     def cog_unload(self) -> None:
@@ -438,7 +535,7 @@ class ModerationCog(commands.Cog):
 
                 embed = self._build_ssu_embed(stats=stats, api_ok=api_ok)
                 message = await channel.fetch_message(message_id)
-                await message.edit(embed=embed, view=SSUPanelView(self.bot))
+                await message.edit(embed=embed, view=SSUPanelView(self.bot, self))
             except discord.NotFound:
                 # Message deleted -> remove from refresh list
                 stale_message_ids.append(message_id)
@@ -843,39 +940,13 @@ class ModerationCog(commands.Cog):
 
         stats, api_ok = await self._fetch_ssu_stats()
         embed = self._build_ssu_embed(stats=stats, api_ok=api_ok)
-        view = SSUPanelView(self.bot)
+        view = SSUPanelView(self.bot, self)
         await interaction.response.send_message(embed=embed, view=view)
         message = await interaction.original_response()
         if interaction.guild is not None:
             self._ssu_panels[message.id] = (interaction.guild.id, interaction.channel_id)
 
-    @ssu_group.command(name="start-stop", description="Start or shut down the session state shown on the SSU panel.")
-    @app_commands.describe(action="Choose Start or Shutdown")
-    @app_commands.choices(action=[
-        app_commands.Choice(name="Start", value="start"),
-        app_commands.Choice(name="Shutdown", value="shutdown"),
-    ])
-    async def ssu_start_stop_command(self, interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Only administrators can use this command.", ephemeral=True)
-            return
 
-        new_state = "Started" if action.value == "start" else "Shutdown"
-        setattr(self.bot, "ssu_session_state", new_state)
-        await self._refresh_ssu_panels_once()
-        await interaction.response.send_message(f"Session state updated to **{new_state}**.", ephemeral=True)
-
-        # Notify session role in-channel so members get pinged.
-        try:
-            notify_role_id = 1497021079842193558
-            notify_text = (
-                f"<@&{notify_role_id}> **Session Started** — the server is now online."
-                if new_state == "Started"
-                else f"<@&{notify_role_id}> **Session Shutdown** — the server is now offline."
-            )
-            await interaction.channel.send(notify_text)
-        except Exception:
-            pass
 
 
 async def setup(bot: commands.Bot) -> None:
