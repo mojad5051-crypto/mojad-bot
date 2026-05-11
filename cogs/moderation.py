@@ -575,6 +575,7 @@ class ModerationCog(commands.Cog):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
 
+        bot_config = get_bot_config(self.bot)
         old_role = user.top_role.name if user.top_role is not None else "No role"
         await user.add_roles(role, reason=reason)
         # Auto-remove old top role if it's not the new role and not @everyone
@@ -619,6 +620,11 @@ class ModerationCog(commands.Cog):
                 logger.info("Skipped duplicate promotion embed send")
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
+
+    @app_commands.command(name="promotion", description="Promote a user by assigning a new role and removing the old one")
+    @app_commands.describe(user="The user to promote", role="The new role to assign", reason="The reason for the promotion")
+    async def promotion_command(self, interaction: discord.Interaction, user: discord.Member, role: discord.Role, reason: str) -> None:
+        await self.promote_command(interaction, user, role, reason)
 
     @commands.command(name="role")
     async def role(self, ctx: commands.Context, member: discord.Member, role_id: int) -> None:
