@@ -8,6 +8,11 @@ import time
 
 logger = logging.getLogger(__name__)
 
+PROMOTION_ROLE_IDS = {1496970658557464586, 1496970649527255110, 1496970641759277228}
+INFRACTION_ROLE_IDS = {1496970664790196344, 1496970658557464586, 1496970657483722902, 1496970654140858498, 1496970641759277228}
+NAME_COMMAND_ROLE_IDS = INFRACTION_ROLE_IDS | PROMOTION_ROLE_IDS
+
+
 def get_bot_config(bot: commands.Bot) -> dict:
     return getattr(bot, "config", {})
 
@@ -192,6 +197,18 @@ class ModerationCog(commands.Cog):
             return False
         self._recent_notification_log[signature] = now
         return True
+
+    def _has_any_role(self, member: discord.Member, allowed_ids: set[int]) -> bool:
+        return any(role.id in allowed_ids for role in member.roles)
+
+    def _is_promotion_authorized(self, member: discord.Member) -> bool:
+        return member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, PROMOTION_ROLE_IDS)
+
+    def _is_infract_authorized(self, member: discord.Member) -> bool:
+        return member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, INFRACTION_ROLE_IDS)
+
+    def _is_name_authorized(self, member: discord.Member) -> bool:
+        return member.guild_permissions.manage_guild or member.guild_permissions.administrator or self._has_any_role(member, NAME_COMMAND_ROLE_IDS)
 
     async def _is_recent_duplicate_message(self, channel: discord.TextChannel, embed: discord.Embed, limit: int = 5) -> bool:
         try:
@@ -554,9 +571,7 @@ class ModerationCog(commands.Cog):
     @app_commands.describe(user="The user to promote", role="The new role to assign", reason="The reason for the promotion")
     async def promote_command(self, interaction: discord.Interaction, user: discord.Member, role: discord.Role, reason: str) -> None:
         # Check permissions
-        promote_roles = [1496970658557464586, 1496970649527255110, 1496970641759277228]
-        has_role = any(role.id in promote_roles for role in interaction.user.roles)
-        if not (interaction.user.guild_permissions.manage_guild or has_role):
+        if not self._is_promotion_authorized(interaction.user):
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
             return
 
@@ -604,6 +619,68 @@ class ModerationCog(commands.Cog):
                 logger.info("Skipped duplicate promotion embed send")
 
         await interaction.response.send_message("Member promoted successfully.", ephemeral=True)
+
+    @commands.command(name="role")
+    async def role(self, ctx: commands.Context, member: discord.Member, role_id: int) -> None:
+        """Assign a role to a user using promotion-role permissions."""
+        if ctx.guild is None:
+            await ctx.send("This command must be used in a guild.")
+            return
+        if not self._is_promotion_authorized(ctx.author):
+            await ctx.send("You do not have permission to use this command.")
+            return
+
+        role = ctx.guild.get_role(role_id)
+        if role is None:
+            await ctx.send(f"Role ID {role_id} not found.")
+            return
+
+        try:
+            await member.add_roles(role, reason=f"Role assigned by {ctx.author}")
+            await ctx.send(f"✅ Assigned role {role.mention} to {member.mention}.")
+        except discord.Forbidden:
+            await ctx.send("I don't have permission to assign that role.")
+        except Exception as exc:
+            await ctx.send(f"Failed to assign role: {exc}")
+
+    @commands.command(name="name")
+    async def name(self, ctx: commands.Context, member: discord.Member, *, new_name: str) -> None:
+        """Change a user's nickname using infraction or promotion roles."""
+        if ctx.guild is None:
+            await ctx.send("This command must be used in a guild.")
+            return
+        if not self._is_name_authorized(ctx.author):
+            await ctx.send("You do not have permission to use this command.")
+            return
+
+        if len(new_name) > 32:
+            await ctx.send("The nickname is too long; it must be 32 characters or fewer.")
+            return
+
+        try:
+            await member.edit(nick=new_name, reason=f"Nickname changed by {ctx.author}")
+            await ctx.send(f"✅ Updated {member.mention}'s nickname to {new_name}.")
+        except discord.Forbidden:
+            await ctx.send("I don't have permission to change that user's nickname.")
+        except Exception as exc:
+            await ctx.send(f"Failed to update nickname: {exc}")
+
+    @commands.command(name="say")
+    async def say(self, ctx: commands.Context, *, message: str) -> None:
+        """Have the bot say a message using promotion-role permissions."""
+        if ctx.guild is None:
+            await ctx.send("This command must be used in a guild.")
+            return
+        if not self._is_promotion_authorized(ctx.author):
+            await ctx.send("You do not have permission to use this command.")
+            return
+
+        try:
+            await ctx.message.delete()
+        except Exception:
+            pass
+
+        await ctx.send(message)
 
     @app_commands.command(name="embed", description="Send a custom embed with multiple sections")
     @app_commands.describe(
